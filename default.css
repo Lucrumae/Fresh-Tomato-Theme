@@ -1,0 +1,104 @@
+/* FreshTomato Theme v2026.1-Final-v27
+   Animated GIF Background Support & High Performance 
+*/
+
+:root {
+    /* --- KONFIGURASI UTAMA --- */
+    /* Ganti bg.png menjadi nama file GIF Anda, misal: background.gif */
+    --bg-image: url('bg.gif'); 
+    --logo-left: url('logol.png');
+    --logo-right: url('logor.png');
+    
+    /* --- WARNA & TRANSPARANSI --- */
+    --text-color: #000000;
+    --accent-red: #ff0000;
+    --panel-white: rgba(255, 255, 255, 0.25);
+    --header-white: rgba(255, 255, 255, 0.3);
+    
+    /* --- UKURAN LOGO --- */
+    --size-left: auto 25px;
+    --size-right: auto 45px;
+
+    /* --- SPEED --- */
+    --transition-speed: 0.2s;
+}
+
+/* --- KEYFRAMES --- */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* --- GLOBAL LAYOUT --- */
+html, body {
+    /* Menggunakan GIF sebagai background */
+    background: var(--bg-image) no-repeat center center fixed !important;
+    background-size: cover !important;
+    background-attachment: fixed !important;
+    animation: fadeIn 0.5s ease-in;
+}
+
+/* --- PANELS --- */
+#container, #content, .section, .fields, fieldset, .box, .content, 
+.message, .tomato-grid, .bwmg, .data-table, table, tbody, thead, 
+tr, td, th {
+    background: var(--panel-white) !important;
+    text-shadow: none !important;
+}
+
+/* --- HEADER & DUAL LOGO --- */
+#header {
+    background-color: var(--header-white) !important;
+    border-bottom: 2px solid var(--accent-red) !important;
+    height: 70px !important;
+    background-image: var(--logo-left), var(--logo-right) !important;
+    background-repeat: no-repeat, no-repeat !important;
+    background-position: left 20px center, right 20px center !important;
+    background-size: var(--size-left), var(--size-right) !important;
+}
+
+#header .title, #header .version { display: none !important; }
+
+/* --- SIDEBAR & VERTICAL DIVIDER --- */
+#navi {
+    background: var(--panel-white) !important;
+    /* Garis pemisah merah vertikal */
+    border-right: 2px solid var(--accent-red) !important; 
+    padding-right: 10px !important;
+}
+
+#navi a {
+    color: var(--text-color) !important;
+    font-weight: 700 !important;
+    transition: transform var(--transition-speed) ease;
+}
+
+#navi a:hover {
+    transform: translateX(5px);
+    color: var(--accent-red) !important;
+}
+
+#navi a.indent1 { color: #cc0000 !important; font-weight: bold !important; }
+
+/* --- TYPOGRAPHY --- */
+body, td, span, div, p, li, label, .message, .content {
+    color: var(--text-color) !important;
+    font-weight: 600 !important;
+}
+
+.section-title, legend, .message b, h1, h2, h3, h4 {
+    color: #cc0000 !important;
+    font-weight: bold !important;
+}
+
+/* --- BUTTONS --- */
+input[type="button"], input[type="submit"] {
+    background: var(--accent-red) !important;
+    border: none !important;
+    color: #ffffff !important;
+    transition: opacity var(--transition-speed) ease;
+}
+
+input[type="button"]:hover, input[type="submit"]:hover {
+    opacity: 0.8;
+}
