@@ -1,9 +1,8 @@
 #!/bin/sh
 
 # =================================================================
-# FreshTomato Theme Installer - Professional Edition
+# FreshTomato Theme Installer - Professional Edition (Strict Flow)
 # Theme: BocchiTheRockTheme
-# Repository: https://github.com/Lucrumae/Fresh-Tomato-Theme
 # =================================================================
 
 echo "===================================================="
@@ -14,74 +13,78 @@ echo "===================================================="
 SOURCE_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/BocchiTheRockTheme/BocchiTheme.tar"
 INSTALL_PATH="/jffs/mywww"
 TEMP_WORKSPACE="/tmp/theme_extract"
-REQUIRED_SPACE=46080  # ~45MB for extraction safety
 
 # 1. ENVIRONMENT VALIDATION
 if ! mount | grep -q "/jffs"; then
-    echo "[ERROR] JFFS partition is not mounted. Please enable it in Administration > JFFS."
+    echo "[ERROR] JFFS partition is not mounted."
     exit 1
 fi
 
 # 2. REINSTALLATION HANDLER
 if [ -d "$INSTALL_PATH" ]; then
-    echo "[INFO] Existing installation detected at $INSTALL_PATH."
-    printf "Would you like to reinstall and overwrite existing assets? (y/n): "
+    echo "[INFO] Existing installation detected."
+    printf "Reinstall and overwrite? (y/n): "
     read choice
     if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
-        echo "[ACTION] Removing previous installation..."
         umount -l /www 2>/dev/null
         rm -rf "$INSTALL_PATH"
     else
-        echo "[INFO] Installation aborted by user."
+        echo "[INFO] Installation aborted."
         exit 0
     fi
 fi
 
-# 3. SYSTEM RESOURCE CHECK
-FREE_RAM=$(df -k /tmp | awk 'NR==2 {print $4}')
-if [ "$FREE_RAM" -lt "$REQUIRED_SPACE" ]; then
-    echo "[ERROR] Insufficient RAM in /tmp. Required: ~45MB | Available: $((FREE_RAM / 1024))MB"
+# 3. DIRECTORY MIRRORING (Step 1)
+echo "[1/7] Mirroring system files to JFFS..."
+mkdir -p "$INSTALL_PATH"
+cp -a /www/. "$INSTALL_PATH/"
+
+# Verification: Check if a crucial file exists in the mirror
+if [ ! -f "$INSTALL_PATH/index.asp" ]; then
+    echo "[ERROR] System mirroring failed. JFFS might be full."
     exit 1
 fi
+echo "[SUCCESS] System mirrored successfully."
 
-# 4. DIRECTORY INITIALIZATION
-echo "[1/6] Initializing JFFS workspace..."
-mkdir -p "$INSTALL_PATH"
-cp -rn /www/* "$INSTALL_PATH/"
+# 4. TARGET REMOVAL (Step 2)
+echo "[2/7] Removing original default.css from JFFS..."
+if [ -f "$INSTALL_PATH/default.css" ]; then
+    rm -f "$INSTALL_PATH/default.css"
+fi
 
-# 5. DOWNLOAD PHASE
+# Double-check if the file is truly gone
+if [ -f "$INSTALL_PATH/default.css" ]; then
+    echo "[ERROR] Failed to remove original default.css. Permission denied?"
+    exit 1
+fi
+echo "[SUCCESS] Original default.css verified as deleted."
+
+# 5. DOWNLOAD PHASE (Step 3)
 mkdir -p "$TEMP_WORKSPACE"
 cd "$TEMP_WORKSPACE" || exit
-echo "[2/6] Downloading theme package from GitHub..."
+echo "[3/7] Downloading theme package..."
 wget --no-check-certificate -U "Mozilla/5.0" "$SOURCE_URL"
 
 if [ ! -s "BocchiTheme.tar" ]; then
-    echo "[ERROR] Download failed. The remote file is missing or empty."
+    echo "[ERROR] Download failed. Remote file not found."
     exit 1
 fi
 
-# 6. ASSET EXTRACTION & OVERWRITE
-echo "[3/6] Preparing asset replacement..."
-
-# Specifically removing the original CSS to ensure a clean overwrite
-if [ -f "$INSTALL_PATH/default.css" ]; then
-    rm -f "$INSTALL_PATH/default.css"
-    echo "[INFO] Original default.css removed from workspace."
-fi
-
-echo "[4/6] Extracting new assets..."
+# 6. EXTRACTION (Step 4)
+echo "[4/7] Extracting theme assets..."
 tar -xf BocchiTheme.tar
 
-# Copying extracted files to JFFS
-# Using -f (force) to ensure any remaining assets are replaced
-cp -f default.css logol.png logor.png bg.gif "$INSTALL_PATH/" 2>/dev/null
+# 7. DEPLOYMENT (Step 5)
+echo "[5/7] Deploying new assets to JFFS..."
+# Simple copy without override flags, since the target folder is ready
+cp -a . "$INSTALL_PATH/"
 
-# Immediate Cleanup
+# Cleanup RAM
 cd /
 rm -rf "$TEMP_WORKSPACE"
 
-# 7. NVRAM PERSISTENCE
-echo "[5/6] Configuring persistence (NVRAM Init Script)..."
+# 8. NVRAM PERSISTENCE
+echo "[6/7] Configuring persistence (NVRAM)..."
 CURRENT_INIT=$(nvram get script_init)
 if ! echo "$CURRENT_INIT" | grep -q "$INSTALL_PATH"; then
     nvram set script_init="$CURRENT_INIT
@@ -91,18 +94,13 @@ if [ -d $INSTALL_PATH ]; then
     service httpd restart
 fi"
     nvram commit
-    echo "[SUCCESS] Init script updated in NVRAM."
-else
-    echo "[INFO] Init script already exists. Skipping update."
 fi
 
-# 8. THEME ACTIVATION
-echo "[6/6] Activating theme..."
+# 9. ACTIVATION
+echo "[7/7] Activating theme..."
 mount --bind "$INSTALL_PATH" /www
 service httpd restart
 
 echo "===================================================="
 echo "           INSTALLATION SUCCESSFUL!                 "
-echo "===================================================="
-echo " Please refresh your browser and clear your cache."
 echo "===================================================="
