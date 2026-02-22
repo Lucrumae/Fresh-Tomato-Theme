@@ -7,7 +7,7 @@ A Custom Theme For Fresh Tomato
 * RAM: Minimum 25MB JFFS & 25MB Ram Free (Required to process 20MB+ assets).
 * JFFS: Must be Enabled & Formatted (Administration > JFFS).
 * Storage: Minimum 25MB+ free space on JFFS.
-Why So Big? Because The Background Using 22 Second Gif
+- Why So Big? Because The Background Using 22 Second Gif
 
 ## 🚀 Quick Installation
 Run this command in your router's SSH terminal or Use PuTTY:
