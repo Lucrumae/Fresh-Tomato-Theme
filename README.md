@@ -17,5 +17,5 @@ chmod +x install
 
 ./install
 
-Only Tested On Linksys EA6300v1/EA6400
+Only Tested On Linksys EA6300v1/EA6400 Fresh Tomato Version 2026.1
 ## I Create This Repository For Personal Use You can try It On Your Own Fresh Tomato Device
