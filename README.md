@@ -4,9 +4,9 @@ A Custom Theme For Fresh Tomato
 <img width="1350" height="632" alt="BocchiTheme" src="https://github.com/user-attachments/assets/d1a2db8d-9763-42f5-8d95-549e8ed5e6e4" />
 
 ## ⚠️ Important Requirements For Bocchi Theme
-* RAM: Minimum 128MB (Required to process large 20MB+ assets), Under 128 MB You Can Test It.
+* RAM: Minimum 25MB JFFS & 25MB Ram Free (Required to process 20MB+ assets).
 * JFFS: Must be Enabled & Formatted (Administration > JFFS).
-* Storage: Minimum 20MB+ free space on JFFS.
+* Storage: Minimum 25MB+ free space on JFFS.
 
 ## 🚀 Quick Installation
 Run this command in your router's SSH terminal:
