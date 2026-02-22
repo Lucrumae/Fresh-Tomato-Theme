@@ -1,92 +1,108 @@
 #!/bin/sh
 
-# FreshTomato Theme Installer - Complete Edition
+# =================================================================
+# FreshTomato Theme Installer - Professional Edition
 # Theme: BocchiTheRockTheme
-# Version: 2.0 (TAR + Reinstall Protection)
+# Repository: https://github.com/Lucrumae/Fresh-Tomato-Theme
+# =================================================================
 
-echo "----------------------------------------"
-echo "  Starting BocchiTheRockTheme Install   "
-echo "----------------------------------------"
+echo "===================================================="
+echo "      BocchiTheRockTheme Installation Wizard        "
+echo "===================================================="
 
 # --- CONFIGURATION ---
-TAR_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/BocchiTheRockTheme/BocchiTheme.tar"
-TMP_DIR="/tmp/theme_extract"
-REQUIRED_KB=46080
+SOURCE_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/BocchiTheRockTheme/BocchiTheme.tar"
+INSTALL_PATH="/jffs/mywww"
+TEMP_WORKSPACE="/tmp/theme_extract"
+REQUIRED_SPACE=46080  # ~45MB for extraction safety
 
-# 1. JFFS CHECK
+# 1. ENVIRONMENT VALIDATION
 if ! mount | grep -q "/jffs"; then
-    echo "ERROR: JFFS tidak aktif! Aktifkan di Administration > JFFS."
+    echo "[ERROR] JFFS partition is not mounted. Please enable it in Administration > JFFS."
     exit 1
 fi
 
-# 2. REINSTALL CHECK (Fitur yang Anda minta)
-if [ -d "/jffs/mywww" ]; then
-    echo "PEMBERITAHUAN: Tema sudah terpasang di /jffs/mywww."
-    printf "Apakah Anda ingin mengunduh ulang dan reinstall? (y/n): "
+# 2. REINSTALLATION HANDLER
+if [ -d "$INSTALL_PATH" ]; then
+    echo "[INFO] Existing installation detected at $INSTALL_PATH."
+    printf "Would you like to reinstall and overwrite existing assets? (y/n): "
     read choice
-    if [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
-        echo "Menghapus instalasi lama dan memulai ulang..."
+    if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
+        echo "[ACTION] Removing previous installation..."
         umount -l /www 2>/dev/null
-        rm -rf /jffs/mywww
+        rm -rf "$INSTALL_PATH"
     else
-        echo "Instalasi dibatalkan."
+        echo "[INFO] Installation aborted by user."
         exit 0
     fi
 fi
 
-# 3. FREE RAM CHECK
+# 3. SYSTEM RESOURCE CHECK
 FREE_RAM=$(df -k /tmp | awk 'NR==2 {print $4}')
-if [ "$FREE_RAM" -lt "$REQUIRED_KB" ]; then
-    echo "ERROR: RAM sisa terlalu sedikit (Butuh ~45MB untuk ekstrak)."
+if [ "$FREE_RAM" -lt "$REQUIRED_SPACE" ]; then
+    echo "[ERROR] Insufficient RAM in /tmp. Required: ~45MB | Available: $((FREE_RAM / 1024))MB"
     exit 1
 fi
 
-# 4. PREPARE WORKSPACE
-echo "[1/6] Preparing JFFS workspace..."
-mkdir -p /jffs/mywww
-# Salin file asli router ke JFFS sebagai base
-cp -rn /www/* /jffs/mywww/
+# 4. DIRECTORY INITIALIZATION
+echo "[1/6] Initializing JFFS workspace..."
+mkdir -p "$INSTALL_PATH"
+cp -rn /www/* "$INSTALL_PATH/"
 
-# 5. DOWNLOAD & EXTRACT
-mkdir -p $TMP_DIR
-cd $TMP_DIR
-echo "[2/6] Downloading BocchiTheme.tar..."
-wget --no-check-certificate -U "Mozilla/5.0" "$TAR_URL"
+# 5. DOWNLOAD PHASE
+mkdir -p "$TEMP_WORKSPACE"
+cd "$TEMP_WORKSPACE" || exit
+echo "[2/6] Downloading theme package from GitHub..."
+wget --no-check-certificate -U "Mozilla/5.0" "$SOURCE_URL"
 
 if [ ! -s "BocchiTheme.tar" ]; then
-    echo "ERROR: File BocchiTheme.tar kosong atau gagal diunduh."
+    echo "[ERROR] Download failed. The remote file is missing or empty."
     exit 1
 fi
 
-echo "[3/6] Extracting and overwriting default.css..."
-tar -xf BocchiTheme.tar
+# 6. ASSET EXTRACTION & OVERWRITE
+echo "[3/6] Preparing asset replacement..."
 
-# 6. OVERWRITE & CLEANUP
-# Di sini file default.css kamu menimpa file asli di JFFS
-cp -f default.css logol.png logor.png bg.gif /jffs/mywww/ 2>/dev/null
-cd /
-rm -rf $TMP_DIR
-
-# 7. PERSISTENCE (NVRAM)
-echo "[4/6] Setting up Persistence..."
-EXISTING_INIT=$(nvram get script_init)
-if ! echo "$EXISTING_INIT" | grep -q "mywww"; then
-    # Menambahkan perintah auto-mount saat router dinyalakan
-    nvram set script_init="$EXISTING_INIT
-sleep 5
-mount --bind /jffs/mywww /www
-service httpd restart"
-    nvram commit
-    echo "      Init script disimpan ke NVRAM."
+# Specifically removing the original CSS to ensure a clean overwrite
+if [ -f "$INSTALL_PATH/default.css" ]; then
+    rm -f "$INSTALL_PATH/default.css"
+    echo "[INFO] Original default.css removed from workspace."
 fi
 
-# 8. ACTIVATION
-echo "[5/6] Activating Theme..."
-mount --bind /jffs/mywww /www
+echo "[4/6] Extracting new assets..."
+tar -xf BocchiTheme.tar
+
+# Copying extracted files to JFFS
+# Using -f (force) to ensure any remaining assets are replaced
+cp -f default.css logol.png logor.png bg.gif "$INSTALL_PATH/" 2>/dev/null
+
+# Immediate Cleanup
+cd /
+rm -rf "$TEMP_WORKSPACE"
+
+# 7. NVRAM PERSISTENCE
+echo "[5/6] Configuring persistence (NVRAM Init Script)..."
+CURRENT_INIT=$(nvram get script_init)
+if ! echo "$CURRENT_INIT" | grep -q "$INSTALL_PATH"; then
+    nvram set script_init="$CURRENT_INIT
+sleep 5
+if [ -d $INSTALL_PATH ]; then
+    mount --bind $INSTALL_PATH /www
+    service httpd restart
+fi"
+    nvram commit
+    echo "[SUCCESS] Init script updated in NVRAM."
+else
+    echo "[INFO] Init script already exists. Skipping update."
+fi
+
+# 8. THEME ACTIVATION
+echo "[6/6] Activating theme..."
+mount --bind "$INSTALL_PATH" /www
 service httpd restart
 
-echo "----------------------------------------"
-echo " INSTALLATION COMPLETE!                 "
-echo " default.css asli telah ditimpa tema.   "
-echo " Silakan refresh browser (Clear Cache). "
-echo "----------------------------------------"
+echo "===================================================="
+echo "           INSTALLATION SUCCESSFUL!                 "
+echo "===================================================="
+echo " Please refresh your browser and clear your cache."
+echo "===================================================="
