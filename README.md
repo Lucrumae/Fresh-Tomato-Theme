@@ -7,6 +7,7 @@ A Custom Theme For Fresh Tomato
 * RAM: Minimum 25MB JFFS & 25MB Ram Free (Required to process 20MB+ assets).
 * JFFS: Must be Enabled & Formatted (Administration > JFFS).
 * Storage: Minimum 25MB+ free space on JFFS.
+## Why So Big? Because The Background Using 22 Second Gif
 
 ## 🚀 Quick Installation
 Run this command in your router's SSH terminal or Use PuTTY:
@@ -17,7 +18,7 @@ chmod +x install
 
 ./install
 
-#Clean Your Browser Cache After Install
+## ⚠️ Clean Your Browser Cache After Install
 
 Only Tested On Linksys EA6300v1/EA6400 Fresh Tomato Version 2026.1
 ## I Create This Repository For Personal Use You can try It On Your Own Fresh Tomato Device
