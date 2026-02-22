@@ -1,8 +1,7 @@
 #!/bin/sh
 
-# FreshTomato Theme Installer & Auto-Init Persistence
+# FreshTomato Theme Installer - Google Drive Edition
 # Theme: BocchiTheRockTheme
-# Repository: https://github.com/Lucrumae/Fresh-Tomato-Theme
 
 echo "----------------------------------------"
 echo "  Starting BocchiTheRockTheme Install   "
@@ -10,129 +9,87 @@ echo "----------------------------------------"
 
 # --- CONFIGURATION ---
 REPO_RAW_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/BocchiTheRockTheme"
+
+# ID File bg.gif dari link Google Drive kamu
+# Ganti ID di bawah ini jika file di drive kamu berubah
+GDRIVE_ID="1vHERv-Dj8qauzwSS1sPrq9Vflhl6A2ue" 
+BG_DIRECT_URL="https://docs.google.com/uc?export=download&id=$GDRIVE_ID&confirm=t"
+
 TMP_DIR="/tmp/BocchiTheRockTheme"
-REQUIRED_KB=25600 
 
-# 1. FREE RAM CHECK
+# 1. STORAGE & RAM CHECK
 FREE_RAM=$(df -k /tmp | awk 'NR==2 {print $4}')
-if [ "$FREE_RAM" -lt "$REQUIRED_KB" ]; then
-    echo "ERROR: Not enough free space on /tmp!"
+if [ "$FREE_RAM" -lt 25600 ]; then
+    echo "ERROR: RAM space too low (Min 25MB free required)."
     exit 1
 fi
 
-# 2. JFFS MOUNT VERIFICATION
+# 2. JFFS PREPARATION
 if ! mount | grep -q "/jffs"; then
-    echo "ERROR: JFFS is not mounted!"
+    echo "ERROR: JFFS not mounted."
     exit 1
 fi
 
-# 3. CHECK FOR PREVIOUS INSTALLATION
+echo "[1/8] Preparing /jffs/mywww..."
 if [ -d "/jffs/mywww" ]; then
-    echo "Warning: /jffs/mywww directory already exists."
-    printf "Do you want to reinstall? (y/n): "
-    read choice
-    if [ "$choice" != "y" ]; then
-        echo "Installation aborted."
-        exit 1
-    fi
     umount -l /www 2>/dev/null
     rm -rf /jffs/mywww
 fi
 
-# 4. PREPARE DIRECTORY
-echo "[1/8] Preparing /jffs/mywww..."
 mkdir -p /jffs/mywww
 cp -rn /www/* /jffs/mywww/
 
-# 5. DOWNLOAD ASSETS (BusyBox Compatible)
+# 3. DOWNLOAD ASSETS
 rm -rf $TMP_DIR
 mkdir -p $TMP_DIR
 cd $TMP_DIR
 
-echo "[2/8] Downloading assets from GitHub..."
+echo "[2/8] Downloading assets..."
 
-FILES="default.css logol.png logor.png bg.gif"
-MAX_RETRIES=5
-
-for FILE in $FILES; do
-    RETRY_COUNT=0
-    SUCCESS=false
-    
-    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-        echo "      Downloading $FILE (Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..."
-        
-        # Menggunakan opsi yang HANYA didukung oleh BusyBox wget Anda
-        wget --no-check-certificate -c -U "Mozilla/5.0" "$REPO_RAW_URL/$FILE"
-        
-        if [ -f "$FILE" ]; then
-            FILE_SIZE=$(du -k "$FILE" | awk '{print $1}')
-        else
-            FILE_SIZE=0
-        fi
-
-        # Validasi ukuran (bg.gif minimal 10MB)
-        if [ "$FILE" = "bg.gif" ]; then
-            MIN_SIZE=10240
-        else
-            MIN_SIZE=1
-        fi
-
-        if [ "$FILE_SIZE" -ge "$MIN_SIZE" ]; then
-            SUCCESS=true
-            echo "      $FILE verified ($((FILE_SIZE / 1024)) MB)."
-            break
-        else
-            RETRY_COUNT=$((RETRY_COUNT + 1))
-            echo "      Error: $FILE too small ($FILE_SIZE KB). Retrying..."
-            [ "$FILE_SIZE" -lt 10 ] && rm -f "$FILE"
-            sleep 3
-        fi
-    done
-
-    if [ "$SUCCESS" = false ]; then
-        echo "ERROR: Failed to download $FILE."
-        cd /
-        rm -rf $TMP_DIR
-        exit 1
-    fi
+# Download file kecil dari GitHub
+for FILE in default.css logol.png logor.png; do
+    echo "      Downloading $FILE..."
+    wget --no-check-certificate -U "Mozilla/5.0" "$REPO_RAW_URL/$FILE"
 done
 
-# 6. JFFS STORAGE CHECK
-THEME_TOTAL_KB=$(du -sk . | awk '{print $1}')
-FREE_JFFS=$(df -k /jffs | awk 'NR==2 {print $4}')
-if [ "$FREE_JFFS" -lt "$THEME_TOTAL_KB" ]; then
-    echo "ERROR: Not enough space on JFFS!"
+# Download bg.gif dari Google Drive
+echo "      Downloading bg.gif from Google Drive..."
+# Menggunakan --no-check-certificate karena BusyBox sering bermasalah dengan SSL Google
+wget --no-check-certificate -U "Mozilla/5.0" -O bg.gif "$BG_DIRECT_URL"
+
+# 4. VALIDATION
+SIZE=$(du -k "bg.gif" | awk '{print $1}')
+if [ "$SIZE" -lt 10000 ]; then
+    echo "ERROR: bg.gif download failed or file is too small ($SIZE KB)."
+    echo "Please make sure the Google Drive link is set to 'Anyone with the link' (Public)."
+    cd /
     exit 1
 fi
+echo "      bg.gif verified ($((SIZE / 1024)) MB)."
 
-# 7. APPLY ASSETS
-echo "[3/8] Applying assets to JFFS..."
+# 5. APPLY TO JFFS
+echo "[3/8] Copying files to JFFS..."
 cp -f * /jffs/mywww/
 cd /
 rm -rf $TMP_DIR
 
-# 8. PERSISTENCE CONFIGURATION
-echo "[4/8] Configuring Auto-mount..."
+# 6. PERSISTENCE (INIT SCRIPT)
+echo "[4/8] Setting up NVRAM..."
 EXISTING_INIT=$(nvram get script_init)
-NEW_INIT_BLOCK="
-# --- BocchiTheRockTheme Start ---
-sleep 5
-if [ -d /jffs/mywww ]; then
-    mount --bind /jffs/mywww /www
-    service httpd restart
-fi
-# --- BocchiTheRockTheme End ---"
-
 if ! echo "$EXISTING_INIT" | grep -q "BocchiTheRockTheme"; then
-    nvram set script_init="$EXISTING_INIT$NEW_INIT_BLOCK"
+    nvram set script_init="$EXISTING_INIT
+sleep 5
+mount --bind /jffs/mywww /www
+service httpd restart"
     nvram commit
 fi
 
-# 9. ACTIVATION
-echo "[5/8] Activating theme immediately..."
+# 7. ACTIVATION
+echo "[5/8] Activating Theme..."
 mount --bind /jffs/mywww /www
 service httpd restart
 
 echo "----------------------------------------"
 echo " INSTALLATION COMPLETE!                 "
+echo " Refresh your browser (Clear Cache).    "
 echo "----------------------------------------"
