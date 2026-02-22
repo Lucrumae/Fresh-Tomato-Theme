@@ -1,5 +1,10 @@
 # Fresh-Tomato-Theme
 A Custom Theme For Fresh Tomato
+## Screenshot
+![Uploading BocchiTheme.png…]()
+![Uploading BocchiTheme.png…]()
+![Uploading BocchiTheme.png…]()
+![Uploading BocchiTheme.png…]()
 
 ## ⚠️ Important Requirements For Bocchi Theme
 * RAM: Minimum 128MB (Required to process large 20MB+ assets), Under 128 MB You Can Test It.
