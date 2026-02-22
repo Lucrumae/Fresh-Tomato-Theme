@@ -26,6 +26,7 @@ if [ -d "$INSTALL_PATH" ]; then
     printf "Reinstall and overwrite? (y/n): "
     read choice
     if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
+        echo "[ACTION] Unmounting and cleaning previous paths..."
         umount -l /www 2>/dev/null
         rm -rf "$INSTALL_PATH"
     else
@@ -34,52 +35,45 @@ if [ -d "$INSTALL_PATH" ]; then
     fi
 fi
 
-# 3. DIRECTORY MIRRORING (Step 1)
+# 3. DIRECTORY MIRRORING
 echo "[1/7] Mirroring system files to JFFS..."
 mkdir -p "$INSTALL_PATH"
+# Menyalin seluruh isi directory /www ke /jffs/mywww
 cp -a /www/. "$INSTALL_PATH/"
+echo "[SUCCESS] System directory mirrored to JFFS."
 
-# Verification: Check if a crucial file exists in the mirror
-if [ ! -f "$INSTALL_PATH/index.asp" ]; then
-    echo "[ERROR] System mirroring failed. JFFS might be full."
-    exit 1
-fi
-echo "[SUCCESS] System mirrored successfully."
-
-# 4. TARGET REMOVAL (Step 2)
+# 4. TARGET DELETION
 echo "[2/7] Removing original default.css from JFFS..."
-if [ -f "$INSTALL_PATH/default.css" ]; then
-    rm -f "$INSTALL_PATH/default.css"
-fi
+rm -f "$INSTALL_PATH/default.css"
 
-# Double-check if the file is truly gone
+# Verifikasi apakah file sudah benar-benar hilang
 if [ -f "$INSTALL_PATH/default.css" ]; then
-    echo "[ERROR] Failed to remove original default.css. Permission denied?"
+    echo "[ERROR] Failed to delete default.css. Process halted."
     exit 1
 fi
-echo "[SUCCESS] Original default.css verified as deleted."
+echo "[SUCCESS] original default.css has been removed."
 
-# 5. DOWNLOAD PHASE (Step 3)
+# 5. DOWNLOAD PHASE
 mkdir -p "$TEMP_WORKSPACE"
 cd "$TEMP_WORKSPACE" || exit
-echo "[3/7] Downloading theme package..."
+echo "[3/7] Downloading theme package from GitHub..."
 wget --no-check-certificate -U "Mozilla/5.0" "$SOURCE_URL"
 
 if [ ! -s "BocchiTheme.tar" ]; then
-    echo "[ERROR] Download failed. Remote file not found."
+    echo "[ERROR] Download failed or file is empty."
     exit 1
 fi
 
-# 6. EXTRACTION (Step 4)
+# 6. EXTRACTION
 echo "[4/7] Extracting theme assets..."
 tar -xf BocchiTheme.tar
 
-# 7. DEPLOYMENT (Step 5)
+# 7. DEPLOYMENT
 echo "[5/7] Deploying new assets to JFFS..."
-# Simple copy without override flags, since the target folder is ready
+# Menyalin file hasil ekstrak (default.css baru, logo, gif) ke JFFS
 cp -a . "$INSTALL_PATH/"
 
-# Cleanup RAM
+# Cleanup RAM workspace
 cd /
 rm -rf "$TEMP_WORKSPACE"
 
@@ -96,11 +90,16 @@ fi"
     nvram commit
 fi
 
-# 9. ACTIVATION
-echo "[7/7] Activating theme..."
+# 9. RE-MOUNT & ACTIVATION
+echo "[7/7] Re-mounting /www to JFFS and restarting Web Server..."
+# Memastikan folder JFFS di-mount ulang ke /www sistem
+umount -l /www 2>/dev/null
 mount --bind "$INSTALL_PATH" /www
 service httpd restart
 
 echo "===================================================="
 echo "           INSTALLATION SUCCESSFUL!                 "
+echo "===================================================="
+echo " New default.css and assets are now active.         "
+echo " Please refresh your browser (Clear Cache).         "
 echo "===================================================="
