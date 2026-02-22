@@ -7,7 +7,7 @@ A Custom Theme For Fresh Tomato
 * RAM: Minimum 25MB Ram Free (Required to process 20MB+ assets while installation).
 * JFFS: Must be Enabled & Formatted (Administration > JFFS).
 * Storage: Minimum 25MB free space on JFFS.
-- Why So Big? Because The Background Using 22 Second Gif
+* Why So Big? Because The Background Use 22 Second Gif
 
 ## 🚀 Quick Installation
 Run this command in your Fresh Tomato device using "Tool > System Commands" terminal or PuTTY:
