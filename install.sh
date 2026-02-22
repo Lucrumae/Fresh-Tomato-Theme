@@ -44,9 +44,11 @@ echo "[1/7] Preparing /jffs/mywww..."
 mkdir -p /jffs/mywww
 cp -rn /www/* /jffs/mywww/
 
-# 5. DOWNLOAD ASSETS WITH AUTO-RETRY
+# 5. DOWNLOAD ASSETS WITH PROGRESS BAR
 rm -rf $TMP_DIR
 mkdir -p $TMP_DIR
+cd $TMP_DIR # Pindah ke folder RAM agar wget mengunduh di sini
+
 echo "[2/7] Downloading assets from GitHub..."
 
 FILES="default.css logol.png logor.png bg.gif"
@@ -58,32 +60,34 @@ for FILE in $FILES; do
     
     while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
         echo "      Downloading $FILE (Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..."
-        wget -qO $TMP_DIR/$FILE "$REPO_RAW_URL/$FILE"
+        
+        # Menggunakan wget standar tanpa -q agar progress bar terlihat
+        wget "$REPO_RAW_URL/$FILE"
         
         # Cek apakah file ada dan tidak kosong
-        if [ -s "$TMP_DIR/$FILE" ]; then
+        if [ -s "$FILE" ]; then
             SUCCESS=true
             break
         else
             RETRY_COUNT=$((RETRY_COUNT + 1))
             echo "      Failed to download $FILE. Retrying in 5 seconds..."
-            rm -f $TMP_DIR/$FILE
+            rm -f "$FILE"
             sleep 5
         fi
     done
 
     if [ "$SUCCESS" = false ]; then
         echo "ERROR: Failed to download $FILE after $MAX_RETRIES attempts."
-        echo "Installation aborted. Please check your internet connection."
+        cd / # Kembali ke root sebelum exit
         rm -rf $TMP_DIR
         exit 1
     fi
 done
 
-# 6. VALIDATION CHECK (Final Double-Check)
+# 6. VALIDATION CHECK
 echo "[3/7] Validating all files..."
 for FILE in $FILES; do
-    if [ ! -s "$TMP_DIR/$FILE" ]; then
+    if [ ! -s "$FILE" ]; then
         echo "ERROR: Validation failed for $FILE."
         exit 1
     fi
@@ -91,7 +95,8 @@ done
 
 # 7. APPLY ASSETS
 echo "[4/7] Applying assets to JFFS..."
-cp -f $TMP_DIR/* /jffs/mywww/
+cp -f * /jffs/mywww/
+cd / # Keluar dari folder tmp
 rm -rf $TMP_DIR
 
 # 8. PERSISTENCE CONFIGURATION
