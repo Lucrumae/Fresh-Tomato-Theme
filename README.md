@@ -10,7 +10,7 @@ A Custom Theme For Fresh Tomato
 * Why So Big? Because The Background Use 22 Second Gif
 
 ## 🚀 Quick Installation
-Run this command in your Fresh Tomato device using PuTTY:
+Run this command in your Fresh Tomato device using PuTTY SSH:
 ##
 wget https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/install
 
