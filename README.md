@@ -9,7 +9,7 @@ A Custom Theme For Fresh Tomato
 * Storage: Minimum 25MB+ free space on JFFS.
 
 ## 🚀 Quick Installation
-Run this command in your router's SSH terminal:
+Run this command in your router's SSH terminal or Use PuTTY:
 
 wget https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/install
 
