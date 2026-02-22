@@ -1,0 +1,83 @@
+#!/bin/sh
+
+# FreshTomato Theme Installer - RAR Edition
+# Theme: BocchiTheRockTheme
+# Repository: https://github.com/Lucrumae/Fresh-Tomato-Theme
+
+echo "----------------------------------------"
+echo "  Starting BocchiTheRockTheme Install   "
+echo "----------------------------------------"
+
+# --- CONFIGURATION ---
+# URL ke file .rar di folder BocchiTheRockTheme
+RAR_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/BocchiTheRockTheme/BocchiTheme.rar"
+TMP_DIR="/tmp/theme_extract"
+REQUIRED_KB=46080 # ~45MB sisa RAM minimal
+
+# 1. FREE RAM CHECK
+FREE_RAM=$(df -k /tmp | awk 'NR==2 {print $4}')
+if [ "$FREE_RAM" -lt "$REQUIRED_KB" ]; then
+    echo "ERROR: RAM sisa kamu terlalu sedikit untuk proses ekstraksi."
+    exit 1
+fi
+
+# 2. JFFS PREPARATION
+if ! mount | grep -q "/jffs"; then
+    echo "ERROR: JFFS tidak terdeteksi (Not Mounted)."
+    exit 1
+fi
+
+echo "[1/6] Preparing /jffs/mywww..."
+umount -l /www 2>/dev/null
+rm -rf /jffs/mywww && mkdir -p /jffs/mywww
+cp -rn /www/* /jffs/mywww/
+
+# 3. DOWNLOAD RAR PACKAGE
+mkdir -p $TMP_DIR
+cd $TMP_DIR
+
+echo "[2/6] Downloading BocchiTheme.rar..."
+wget --no-check-certificate -U "Mozilla/5.0" "$RAR_URL"
+
+if [ ! -s "BocchiTheme.rar" ]; then
+    echo "ERROR: Gagal mendownload file atau file kosong."
+    exit 1
+fi
+
+# 4. EXTRACT FILES
+echo "[3/6] Extracting files..."
+# Mencoba menggunakan unrar, jika gagal coba unzip (beberapa busybox support rar via unzip)
+if command -v unrar > /dev/null; then
+    unrar e BocchiTheme.rar
+elif command -v unzip > /dev/null; then
+    unzip BocchiTheme.rar
+else
+    echo "ERROR: Router kamu tidak punya perintah 'unrar' atau 'unzip'."
+    echo "Saran: Upload ulang file dalam format .tar (theme.tar) agar pasti bisa diekstrak."
+    exit 1
+fi
+
+# 5. MOVE TO JFFS
+echo "[4/6] Moving assets to JFFS..."
+cp -f default.css logol.png logor.png bg.gif /jffs/mywww/ 2>/dev/null
+cd /
+rm -rf $TMP_DIR
+
+# 6. PERSISTENCE & ACTIVATION
+echo "[5/6] Setting up Persistence..."
+EXISTING_INIT=$(nvram get script_init)
+if ! echo "$EXISTING_INIT" | grep -q "mywww"; then
+    nvram set script_init="$EXISTING_INIT
+sleep 5
+mount --bind /jffs/mywww /www
+service httpd restart"
+    nvram commit
+fi
+
+echo "[6/6] Activating Theme..."
+mount --bind /jffs/mywww /www
+service httpd restart
+
+echo "----------------------------------------"
+echo " INSTALLATION COMPLETE! "
+echo "----------------------------------------"
