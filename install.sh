@@ -9,7 +9,6 @@ echo "  Starting BocchiTheRockTheme Install   "
 echo "----------------------------------------"
 
 # --- CONFIGURATION ---
-# Pastikan huruf besar/kecil (Case Sensitive) di bawah ini sama persis dengan di GitHub
 REPO_RAW_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/BocchiTheRockTheme"
 TMP_DIR="/tmp/BocchiTheRockTheme"
 REQUIRED_KB=25600 
@@ -23,7 +22,7 @@ fi
 
 # 2. JFFS MOUNT VERIFICATION
 if ! mount | grep -q "/jffs"; then
-    echo "ERROR: JFFS is not mounted! Please enable it in Administration > JFFS."
+    echo "ERROR: JFFS is not mounted!"
     exit 1
 fi
 
@@ -45,13 +44,12 @@ echo "[1/8] Preparing /jffs/mywww..."
 mkdir -p /jffs/mywww
 cp -rn /www/* /jffs/mywww/
 
-# 5. DOWNLOAD ASSETS WITH ROBUST PARAMETERS
+# 5. DOWNLOAD ASSETS (BusyBox Compatible)
 rm -rf $TMP_DIR
 mkdir -p $TMP_DIR
 cd $TMP_DIR
 
 echo "[2/8] Downloading assets from GitHub..."
-echo "      (Large files like bg.gif may take several minutes)"
 
 FILES="default.css logol.png logor.png bg.gif"
 MAX_RETRIES=5
@@ -63,12 +61,8 @@ for FILE in $FILES; do
     while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
         echo "      Downloading $FILE (Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..."
         
-        # PARAMETER PERBAIKAN:
-        # -L: Follow redirects (Penting untuk GitHub)
-        # --no-check-certificate: Lewati error SSL router
-        # -U: User Agent (Menyamar sebagai browser agar tidak diblokir)
-        # -t 3: Timeout retry otomatis
-        wget -L --no-check-certificate -U "Mozilla/5.0" -c "$REPO_RAW_URL/$FILE"
+        # Menggunakan opsi yang HANYA didukung oleh BusyBox wget Anda
+        wget --no-check-certificate -c -U "Mozilla/5.0" "$REPO_RAW_URL/$FILE"
         
         if [ -f "$FILE" ]; then
             FILE_SIZE=$(du -k "$FILE" | awk '{print $1}')
@@ -76,7 +70,7 @@ for FILE in $FILES; do
             FILE_SIZE=0
         fi
 
-        # Validasi: bg.gif tidak boleh kurang dari 10MB (10240KB)
+        # Validasi ukuran (bg.gif minimal 10MB)
         if [ "$FILE" = "bg.gif" ]; then
             MIN_SIZE=10240
         else
@@ -89,15 +83,14 @@ for FILE in $FILES; do
             break
         else
             RETRY_COUNT=$((RETRY_COUNT + 1))
-            echo "      Error: $FILE too small ($FILE_SIZE KB). Link might be wrong or interrupted."
-            # Jika file sangat kecil (error page), hapus dan coba lagi tanpa mode -c
-            [ "$FILE_SIZE" -lt 100 ] && rm -f "$FILE"
-            sleep 5
+            echo "      Error: $FILE too small ($FILE_SIZE KB). Retrying..."
+            [ "$FILE_SIZE" -lt 10 ] && rm -f "$FILE"
+            sleep 3
         fi
     done
 
     if [ "$SUCCESS" = false ]; then
-        echo "ERROR: Failed to download $FILE. Check your GitHub file name and folder!"
+        echo "ERROR: Failed to download $FILE."
         cd /
         rm -rf $TMP_DIR
         exit 1
@@ -107,10 +100,8 @@ done
 # 6. JFFS STORAGE CHECK
 THEME_TOTAL_KB=$(du -sk . | awk '{print $1}')
 FREE_JFFS=$(df -k /jffs | awk 'NR==2 {print $4}')
-
 if [ "$FREE_JFFS" -lt "$THEME_TOTAL_KB" ]; then
     echo "ERROR: Not enough space on JFFS!"
-    echo "Required: $((THEME_TOTAL_KB / 1024))MB | Free: $((FREE_JFFS / 1024))MB"
     exit 1
 fi
 
@@ -120,8 +111,8 @@ cp -f * /jffs/mywww/
 cd /
 rm -rf $TMP_DIR
 
-# 8. PERSISTENCE CONFIGURATION (INIT SCRIPT)
-echo "[4/8] Configuring Auto-mount in Init script..."
+# 8. PERSISTENCE CONFIGURATION
+echo "[4/8] Configuring Auto-mount..."
 EXISTING_INIT=$(nvram get script_init)
 NEW_INIT_BLOCK="
 # --- BocchiTheRockTheme Start ---
@@ -129,9 +120,9 @@ sleep 5
 if [ -d /jffs/mywww ]; then
     mount --bind /jffs/mywww /www
     service httpd restart
-    logger \"BocchiTheme: Mounted successfully.\"
 fi
 # --- BocchiTheRockTheme End ---"
+
 if ! echo "$EXISTING_INIT" | grep -q "BocchiTheRockTheme"; then
     nvram set script_init="$EXISTING_INIT$NEW_INIT_BLOCK"
     nvram commit
@@ -144,5 +135,4 @@ service httpd restart
 
 echo "----------------------------------------"
 echo " INSTALLATION COMPLETE!                 "
-echo " Refresh your browser to see the theme. "
 echo "----------------------------------------"
