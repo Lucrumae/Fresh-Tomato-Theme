@@ -19,7 +19,7 @@ chmod +x install
 ./install
 
 ## ⚠️ Clean Your Browser Cache After Install
-## If The Background Lag Wait Until The Gif Finish Playing
+## If The Background Lag Wait Until The Gif Finishes Playing
 
 Only Tested On Linksys EA6300v1/EA6400 Fresh Tomato Version 2026.1
 ## I Create This Repository For Personal Use You can try It On Your Own Fresh Tomato Device
