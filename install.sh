@@ -8,51 +8,36 @@ echo "----------------------------------------"
 echo "  Starting BocchiTheRockTheme Install   "
 echo "----------------------------------------"
 
-# --- CONFIGURATION & ESTIMATIONS ---
-# URL pointing to the folder inside the main branch
+# --- CONFIGURATION ---
 REPO_RAW_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/BocchiTheRockTheme"
 TMP_DIR="/tmp/BocchiTheRockTheme"
-ESTIMATED_THEME_KB=46080 # ~45MB
-MIN_TOTAL_RAM_KB=126000 # Requirement for 128MB RAM
+REQUIRED_KB=25600 # 25MB requirement for both RAM and JFFS
 
-# 1. TOTAL RAM REQUIREMENT CHECK
-TOTAL_RAM=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+# 1. FREE RAM CHECK (Available space in /tmp)
+FREE_RAM=$(df -k /tmp | awk 'NR==2 {print $4}')
 
-if [ "$TOTAL_RAM" -lt "$MIN_TOTAL_RAM_KB" ]; then
-    echo "ERROR: Your router does not meet the RAM requirement."
-    echo "This theme requires at least 128MB of RAM to handle large assets (40MB+)."
-    echo "Your Total RAM: $(echo $TOTAL_RAM | awk '{print $1/1024}')MB"
+if [ "$FREE_RAM" -lt "$REQUIRED_KB" ]; then
+    echo "ERROR: Not enough free space on /tmp!"
+    echo "This theme needs at least 25MB of FREE RAM to download assets."
+    echo "Available: $(echo $FREE_RAM | awk '{print $1/1024}')MB"
     echo "Installation aborted."
     exit 1
 fi
 
-# 2. PRE-INSTALL RAM SPACE CHECK (/tmp)
-FREE_RAM=$(df -k /tmp | awk 'NR==2 {print $4}')
-
-if [ "$FREE_RAM" -lt "$ESTIMATED_THEME_KB" ]; then
-    echo "ERROR: Not enough free space on /tmp!"
-    echo "Looks like your RAM needs to be cleaned or is too full."
-    echo "Available RAM space: $(echo $FREE_RAM | awk '{print $1/1024}')MB"
-    echo "Required space: ~45MB"
-    echo "----------------------------------------"
-    exit 1
-fi
-
-# 3. JFFS MOUNT VERIFICATION
+# 2. JFFS MOUNT VERIFICATION
 if ! mount | grep -q "/jffs"; then
     echo "ERROR: JFFS is not mounted!"
     echo "Please enable and format JFFS in 'Administration > JFFS' first."
-    echo "Installation aborted."
     exit 1
 fi
 
-# 4. CHECK FOR PREVIOUS INSTALLATION
+# 3. CHECK FOR PREVIOUS INSTALLATION
 if [ -d "/jffs/mywww" ]; then
     echo "Warning: /jffs/mywww directory already exists."
     printf "Do you want to reinstall? (y/n): "
     read choice
     if [ "$choice" != "y" ]; then
-        echo "Installation aborted by user."
+        echo "Installation aborted."
         exit 1
     fi
     echo "Cleaning up old installation..."
@@ -60,10 +45,19 @@ if [ -d "/jffs/mywww" ]; then
     rm -rf /jffs/mywww
 fi
 
+# 4. JFFS STORAGE CHECK (BEFORE STARTING)
+FREE_JFFS=$(df -k /jffs | awk 'NR==2 {print $4}')
+if [ "$FREE_JFFS" -lt "$REQUIRED_KB" ]; then
+    echo "ERROR: Not enough space on JFFS!"
+    echo "This theme needs at least 25MB of free space on JFFS."
+    echo "Available JFFS: $(echo $FREE_JFFS | awk '{print $1/1024}')MB"
+    exit 1
+fi
+
 # 5. DIRECTORY PREPARATION & SYSTEM COPY
 echo "[1/6] Preparing /jffs/mywww..."
 mkdir -p /jffs/mywww
-echo "[2/6] Copying original system files (this may take a moment)..."
+echo "[2/6] Copying original system files..."
 cp -rn /www/* /jffs/mywww/
 
 # 6. DOWNLOAD ASSETS FROM GITHUB
@@ -75,21 +69,10 @@ wget -qO $TMP_DIR/logol.png "$REPO_RAW_URL/logol.png"
 wget -qO $TMP_DIR/logor.png "$REPO_RAW_URL/logor.png"
 wget -qO $TMP_DIR/bg.gif "$REPO_RAW_URL/bg.gif"
 
-# 7. FINAL STORAGE CHECK (JFFS)
-THEME_SIZE=$(du -sk $TMP_DIR | awk '{print $1}')
-FREE_JFFS=$(df -k /jffs | awk 'NR==2 {print $4}')
-
-if [ "$FREE_JFFS" -lt "$THEME_SIZE" ]; then
-    REQ_MB=$(echo $THEME_SIZE | awk '{printf "%.2f", $1/1024}')
-    echo "ERROR: Not enough space on JFFS!"
-    echo "This theme needs approximately ${REQ_MB}MB space."
-    echo "Installation aborted."
-    exit 1
-else
-    echo "[4/6] Space check passed. Applying assets to JFFS..."
-    cp -f $TMP_DIR/* /jffs/mywww/
-    rm -rf $TMP_DIR
-fi
+# 7. APPLY ASSETS
+echo "[4/6] Applying assets to JFFS..."
+cp -f $TMP_DIR/* /jffs/mywww/
+rm -rf $TMP_DIR # Immediately free up 25MB+ RAM
 
 # 8. PERSISTENCE CONFIGURATION
 echo "[5/6] Configuring Auto-mount in Init script..."
@@ -122,6 +105,7 @@ fi
 echo "[6/6] Activating theme immediately..."
 mount --bind /jffs/mywww /www
 service httpd restart
+
 echo "----------------------------------------"
 echo " INSTALLATION COMPLETE!                 "
 echo " Refresh your browser to see the theme. "
