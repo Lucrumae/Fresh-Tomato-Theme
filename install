@@ -1,80 +1,92 @@
 #!/bin/sh
 
-# FreshTomato Theme Installer - TAR Edition
+# FreshTomato Theme Installer - Complete Edition
 # Theme: BocchiTheRockTheme
-# Repository: https://github.com/Lucrumae/Fresh-Tomato-Theme
+# Version: 2.0 (TAR + Reinstall Protection)
 
 echo "----------------------------------------"
 echo "  Starting BocchiTheRockTheme Install   "
 echo "----------------------------------------"
 
 # --- CONFIGURATION ---
-# URL mengarah ke file .tar yang baru kamu upload
 TAR_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/BocchiTheRockTheme/BocchiTheme.tar"
 TMP_DIR="/tmp/theme_extract"
 REQUIRED_KB=46080
 
-# 1. FREE RAM CHECK
+# 1. JFFS CHECK
+if ! mount | grep -q "/jffs"; then
+    echo "ERROR: JFFS tidak aktif! Aktifkan di Administration > JFFS."
+    exit 1
+fi
+
+# 2. REINSTALL CHECK (Fitur yang Anda minta)
+if [ -d "/jffs/mywww" ]; then
+    echo "PEMBERITAHUAN: Tema sudah terpasang di /jffs/mywww."
+    printf "Apakah Anda ingin mengunduh ulang dan reinstall? (y/n): "
+    read choice
+    if [ "$choice" = "y" ] || [ "$choice" = "Y" ]; then
+        echo "Menghapus instalasi lama dan memulai ulang..."
+        umount -l /www 2>/dev/null
+        rm -rf /jffs/mywww
+    else
+        echo "Instalasi dibatalkan."
+        exit 0
+    fi
+fi
+
+# 3. FREE RAM CHECK
 FREE_RAM=$(df -k /tmp | awk 'NR==2 {print $4}')
 if [ "$FREE_RAM" -lt "$REQUIRED_KB" ]; then
-    echo "ERROR: RAM sisa kamu terlalu sedikit (Butuh sisa ~45MB)."
+    echo "ERROR: RAM sisa terlalu sedikit (Butuh ~45MB untuk ekstrak)."
     exit 1
 fi
 
-# 2. JFFS PREPARATION
-if ! mount | grep -q "/jffs"; then
-    echo "ERROR: JFFS tidak aktif! Pastikan JFFS sudah diformat di Administration > JFFS."
-    exit 1
-fi
-
-echo "[1/6] Preparing /jffs/mywww..."
-umount -l /www 2>/dev/null
-rm -rf /jffs/mywww && mkdir -p /jffs/mywww
+# 4. PREPARE WORKSPACE
+echo "[1/6] Preparing JFFS workspace..."
+mkdir -p /jffs/mywww
+# Salin file asli router ke JFFS sebagai base
 cp -rn /www/* /jffs/mywww/
 
-# 3. DOWNLOAD TAR PACKAGE
+# 5. DOWNLOAD & EXTRACT
 mkdir -p $TMP_DIR
 cd $TMP_DIR
-
 echo "[2/6] Downloading BocchiTheme.tar..."
-# Menggunakan --no-check-certificate agar tidak error SSL
 wget --no-check-certificate -U "Mozilla/5.0" "$TAR_URL"
 
 if [ ! -s "BocchiTheme.tar" ]; then
-    echo "ERROR: Gagal download BocchiTheme.tar. Periksa koneksi internet."
+    echo "ERROR: File BocchiTheme.tar kosong atau gagal diunduh."
     exit 1
 fi
 
-# 4. EXTRACT FILES
-echo "[3/6] Extracting files..."
-# Perintah tar -xf pasti didukung oleh FreshTomato
+echo "[3/6] Extracting and overwriting default.css..."
 tar -xf BocchiTheme.tar
 
-# 5. MOVE TO JFFS
-echo "[4/6] Moving assets to JFFS..."
-# Menyalin file spesifik hasil ekstrak ke folder target
+# 6. OVERWRITE & CLEANUP
+# Di sini file default.css kamu menimpa file asli di JFFS
 cp -f default.css logol.png logor.png bg.gif /jffs/mywww/ 2>/dev/null
-
-# Langsung bersihkan RAM
 cd /
 rm -rf $TMP_DIR
 
-# 6. PERSISTENCE & ACTIVATION
-echo "[5/6] Setting up Persistence (NVRAM)..."
+# 7. PERSISTENCE (NVRAM)
+echo "[4/6] Setting up Persistence..."
 EXISTING_INIT=$(nvram get script_init)
 if ! echo "$EXISTING_INIT" | grep -q "mywww"; then
+    # Menambahkan perintah auto-mount saat router dinyalakan
     nvram set script_init="$EXISTING_INIT
 sleep 5
 mount --bind /jffs/mywww /www
 service httpd restart"
     nvram commit
+    echo "      Init script disimpan ke NVRAM."
 fi
 
-echo "[6/6] Activating Theme..."
+# 8. ACTIVATION
+echo "[5/6] Activating Theme..."
 mount --bind /jffs/mywww /www
 service httpd restart
 
 echo "----------------------------------------"
 echo " INSTALLATION COMPLETE!                 "
-echo " Silakan refresh browser kamu.          "
+echo " default.css asli telah ditimpa tema.   "
+echo " Silakan refresh browser (Clear Cache). "
 echo "----------------------------------------"
