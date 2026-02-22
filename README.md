@@ -11,11 +11,13 @@ A Custom Theme For Fresh Tomato
 
 ## 🚀 Quick Installation
 Run this command in your Fresh Tomato device using "Tool > System Commands" or PuTTY:
-
+##
+cd /tmp
+##
 wget https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/install
-
+##
 chmod +x install
-
+##
 ./install
 
 ## ⚠️ Clean Your Browser Cache After Install
