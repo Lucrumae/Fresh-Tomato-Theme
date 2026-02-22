@@ -4,9 +4,9 @@ A Custom Theme For Fresh Tomato
 <img width="1350" height="632" alt="BocchiTheme" src="https://github.com/user-attachments/assets/d1a2db8d-9763-42f5-8d95-549e8ed5e6e4" />
 
 ## ⚠️ Important Requirements For Bocchi Theme
-* RAM: Minimum 25MB JFFS & 25MB Ram Free (Required to process 20MB+ assets).
+* RAM: Minimum 25MB Ram Free (Required to process 20MB+ assets while installation).
 * JFFS: Must be Enabled & Formatted (Administration > JFFS).
-* Storage: Minimum 25MB+ free space on JFFS.
+* Storage: Minimum 25MB free space on JFFS.
 - Why So Big? Because The Background Using 22 Second Gif
 
 ## 🚀 Quick Installation
