@@ -12,7 +12,9 @@ A Custom Theme For Fresh Tomato
 Run this command in your router's SSH terminal:
 
 bash
-wget https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/install.sh](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/install.sh && chmod +x install.sh && ./install.sh
+wget https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/install.sh](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/install.sh
+chmod +x install.sh
+./install.sh
 
 Only Tested On Linksys EA6300v1/EA6400
 ## I Create This Repository For Personal Use You can try It On Your Own Fresh Tomato Device
