@@ -11,23 +11,18 @@ echo "----------------------------------------"
 # --- CONFIGURATION ---
 REPO_RAW_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/BocchiTheRockTheme"
 TMP_DIR="/tmp/BocchiTheRockTheme"
-REQUIRED_KB=25600 # 25MB requirement for both RAM and JFFS
+REQUIRED_KB=25600 
 
-# 1. FREE RAM CHECK (Available space in /tmp)
+# 1. FREE RAM CHECK
 FREE_RAM=$(df -k /tmp | awk 'NR==2 {print $4}')
-
 if [ "$FREE_RAM" -lt "$REQUIRED_KB" ]; then
     echo "ERROR: Not enough free space on /tmp!"
-    echo "This theme needs at least 25MB of FREE RAM to download assets."
-    echo "Available: $(echo $FREE_RAM | awk '{print $1/1024}')MB"
-    echo "Installation aborted."
     exit 1
 fi
 
 # 2. JFFS MOUNT VERIFICATION
 if ! mount | grep -q "/jffs"; then
     echo "ERROR: JFFS is not mounted!"
-    echo "Please enable and format JFFS in 'Administration > JFFS' first."
     exit 1
 fi
 
@@ -40,42 +35,67 @@ if [ -d "/jffs/mywww" ]; then
         echo "Installation aborted."
         exit 1
     fi
-    echo "Cleaning up old installation..."
     umount -l /www 2>/dev/null
     rm -rf /jffs/mywww
 fi
 
-# 4. JFFS STORAGE CHECK (BEFORE STARTING)
-FREE_JFFS=$(df -k /jffs | awk 'NR==2 {print $4}')
-if [ "$FREE_JFFS" -lt "$REQUIRED_KB" ]; then
-    echo "ERROR: Not enough space on JFFS!"
-    echo "This theme needs at least 25MB of free space on JFFS."
-    echo "Available JFFS: $(echo $FREE_JFFS | awk '{print $1/1024}')MB"
-    exit 1
-fi
-
-# 5. DIRECTORY PREPARATION & SYSTEM COPY
-echo "[1/6] Preparing /jffs/mywww..."
+# 4. PREPARE DIRECTORY
+echo "[1/7] Preparing /jffs/mywww..."
 mkdir -p /jffs/mywww
-echo "[2/6] Copying original system files..."
 cp -rn /www/* /jffs/mywww/
 
-# 6. DOWNLOAD ASSETS FROM GITHUB
+# 5. DOWNLOAD ASSETS WITH AUTO-RETRY
 rm -rf $TMP_DIR
 mkdir -p $TMP_DIR
-echo "[3/6] Downloading assets from BocchiTheRockTheme folder..."
-wget -qO $TMP_DIR/default.css "$REPO_RAW_URL/default.css"
-wget -qO $TMP_DIR/logol.png "$REPO_RAW_URL/logol.png"
-wget -qO $TMP_DIR/logor.png "$REPO_RAW_URL/logor.png"
-wget -qO $TMP_DIR/bg.gif "$REPO_RAW_URL/bg.gif"
+echo "[2/7] Downloading assets from GitHub..."
+
+FILES="default.css logol.png logor.png bg.gif"
+MAX_RETRIES=3
+
+for FILE in $FILES; do
+    RETRY_COUNT=0
+    SUCCESS=false
+    
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        echo "      Downloading $FILE (Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..."
+        wget -qO $TMP_DIR/$FILE "$REPO_RAW_URL/$FILE"
+        
+        # Cek apakah file ada dan tidak kosong
+        if [ -s "$TMP_DIR/$FILE" ]; then
+            SUCCESS=true
+            break
+        else
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "      Failed to download $FILE. Retrying in 5 seconds..."
+            rm -f $TMP_DIR/$FILE
+            sleep 5
+        fi
+    done
+
+    if [ "$SUCCESS" = false ]; then
+        echo "ERROR: Failed to download $FILE after $MAX_RETRIES attempts."
+        echo "Installation aborted. Please check your internet connection."
+        rm -rf $TMP_DIR
+        exit 1
+    fi
+done
+
+# 6. VALIDATION CHECK (Final Double-Check)
+echo "[3/7] Validating all files..."
+for FILE in $FILES; do
+    if [ ! -s "$TMP_DIR/$FILE" ]; then
+        echo "ERROR: Validation failed for $FILE."
+        exit 1
+    fi
+done
 
 # 7. APPLY ASSETS
-echo "[4/6] Applying assets to JFFS..."
+echo "[4/7] Applying assets to JFFS..."
 cp -f $TMP_DIR/* /jffs/mywww/
-rm -rf $TMP_DIR # Immediately free up 25MB+ RAM
+rm -rf $TMP_DIR
 
 # 8. PERSISTENCE CONFIGURATION
-echo "[5/6] Configuring Auto-mount in Init script..."
+echo "[5/7] Configuring Auto-mount in Init script..."
 EXISTING_INIT=$(nvram get script_init)
 NEW_INIT_BLOCK="
 # --- BocchiTheRockTheme Start ---
@@ -98,11 +118,10 @@ fi
 if ! echo "$EXISTING_INIT" | grep -q "BocchiTheRockTheme"; then
     nvram set script_init="$EXISTING_INIT$NEW_INIT_BLOCK"
     nvram commit
-    echo "      Init script updated."
 fi
 
 # 9. ACTIVATION
-echo "[6/6] Activating theme immediately..."
+echo "[6/7] Activating theme immediately..."
 mount --bind /jffs/mywww /www
 service httpd restart
 
