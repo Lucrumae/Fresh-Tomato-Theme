@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # =================================================================
-# FreshTomato Theme Installer - Professional Edition (Strict Flow)
+# FreshTomato Theme Installer - Professional Edition (25MB Limit)
 # Theme: BocchiTheRockTheme
 # =================================================================
 
@@ -13,6 +13,7 @@ echo "===================================================="
 SOURCE_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/BocchiTheRockTheme/BocchiTheme.tar"
 INSTALL_PATH="/jffs/mywww"
 TEMP_WORKSPACE="/tmp/theme_extract"
+REQUIRED_SPACE=25600  # Adjusted to 25MB (25600 KB)
 
 # 1. ENVIRONMENT VALIDATION
 if ! mount | grep -q "/jffs"; then
@@ -35,28 +36,33 @@ if [ -d "$INSTALL_PATH" ]; then
     fi
 fi
 
-# 3. DIRECTORY MIRRORING
+# 3. SYSTEM RESOURCE CHECK
+FREE_RAM=$(df -k /tmp | awk 'NR==2 {print $4}')
+if [ "$FREE_RAM" -lt "$REQUIRED_SPACE" ]; then
+    echo "[ERROR] Insufficient RAM. Required: 25MB | Available: $((FREE_RAM / 1024))MB"
+    exit 1
+fi
+
+# 4. DIRECTORY MIRRORING
 echo "[1/7] Mirroring system files to JFFS..."
 mkdir -p "$INSTALL_PATH"
-# Menyalin seluruh isi directory /www ke /jffs/mywww
 cp -a /www/. "$INSTALL_PATH/"
 echo "[SUCCESS] System directory mirrored to JFFS."
 
-# 4. TARGET DELETION
+# 5. TARGET DELETION
 echo "[2/7] Removing original default.css from JFFS..."
 rm -f "$INSTALL_PATH/default.css"
 
-# Verifikasi apakah file sudah benar-benar hilang
 if [ -f "$INSTALL_PATH/default.css" ]; then
     echo "[ERROR] Failed to delete default.css. Process halted."
     exit 1
 fi
-echo "[SUCCESS] original default.css has been removed."
+echo "[SUCCESS] Original default.css has been removed."
 
-# 5. DOWNLOAD PHASE
+# 6. DOWNLOAD PHASE
 mkdir -p "$TEMP_WORKSPACE"
 cd "$TEMP_WORKSPACE" || exit
-echo "[3/7] Downloading theme package from GitHub..."
+echo "[3/7] Downloading theme package (25MB limit check)..."
 wget --no-check-certificate -U "Mozilla/5.0" "$SOURCE_URL"
 
 if [ ! -s "BocchiTheme.tar" ]; then
@@ -64,20 +70,18 @@ if [ ! -s "BocchiTheme.tar" ]; then
     exit 1
 fi
 
-# 6. EXTRACTION
+# 7. EXTRACTION
 echo "[4/7] Extracting theme assets..."
 tar -xf BocchiTheme.tar
 
-# 7. DEPLOYMENT
+# 8. DEPLOYMENT
 echo "[5/7] Deploying new assets to JFFS..."
-# Menyalin file hasil ekstrak (default.css baru, logo, gif) ke JFFS
 cp -a . "$INSTALL_PATH/"
 
-# Cleanup RAM workspace
 cd /
 rm -rf "$TEMP_WORKSPACE"
 
-# 8. NVRAM PERSISTENCE
+# 9. NVRAM PERSISTENCE
 echo "[6/7] Configuring persistence (NVRAM)..."
 CURRENT_INIT=$(nvram get script_init)
 if ! echo "$CURRENT_INIT" | grep -q "$INSTALL_PATH"; then
@@ -90,16 +94,12 @@ fi"
     nvram commit
 fi
 
-# 9. RE-MOUNT & ACTIVATION
+# 10. RE-MOUNT & ACTIVATION
 echo "[7/7] Re-mounting /www to JFFS and restarting Web Server..."
-# Memastikan folder JFFS di-mount ulang ke /www sistem
 umount -l /www 2>/dev/null
 mount --bind "$INSTALL_PATH" /www
 service httpd restart
 
 echo "===================================================="
 echo "           INSTALLATION SUCCESSFUL!                 "
-echo "===================================================="
-echo " New default.css and assets are now active.         "
-echo " Please refresh your browser (Clear Cache).         "
 echo "===================================================="
