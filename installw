@@ -125,7 +125,6 @@ echo -e "${CYAN}[4/4]${NC} Finalizing system integration..."
 chmod 755 "$INSTALL_PATH"
 chmod 644 "$INSTALL_PATH"/*
 
-> Rachel:
 # Update NVRAM boot script
 CURRENT_INIT=$(nvram get script_init | sed "/# --- Theme Startup ---/,/fi/d")
 nvram set script_init="$CURRENT_INIT
