@@ -5,14 +5,14 @@
 # GLOBAL CONFIGURATION
 # =================================================================
 APP_NAME="BocchiTheRockTheme"
-VERSION="2026.3-PRO"
-# URL Download otomatis repositori GitHub
+VERSION="2026.4-PRO"
+# Menggunakan URL tarball repositori
 SOURCE_URL="https://github.com/Lucrumae/Fresh-Tomato-Theme/archive/refs/heads/main.tar.gz"
 INSTALL_PATH="/jffs/mywww"
-TEMP_WORKSPACE="/tmp/theme_deploy_$(date +%s)"
-REQUIRED_SPACE_KB=30720 # 30MB Buffer
+TEMP_WORKSPACE="/tmp/theme_deploy"
+REQUIRED_SPACE_KB=30720
 
-# ANSI Colors for Professional UI
+# Manual Colors (Simple Escape Codes)
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -20,89 +20,87 @@ YELLOW='\033[1;33m'
 NC='\033[0m' 
 
 # =================================================================
-# HELPER FUNCTIONS
-# =================================================================
-log() { echo -e "${CYAN}[$(date +%H:%M:%S)]${NC} $1"; }
-error_exit() { 
-    echo -e "${RED}[ERROR] $1${NC}"
-    # Cleanup on failure
-    [ -d "$TEMP_WORKSPACE" ] && rm -rf "$TEMP_WORKSPACE"
-    exit 1 
-}
-
-print_header() {
-    clear
-    echo -e "${CYAN}===================================================="
-    echo -e "      ${GREEN}${APP_NAME} Installer - v${VERSION}${NC}"
-    echo -e "      Enterprise Deployment for FreshTomato"
-    echo -e "${CYAN}====================================================${NC}"
-}
-
-# =================================================================
 # PHASE 1: PRE-FLIGHT CHECKS
 # =================================================================
-print_header
-log "Verifying system environment..."
+clear
+echo "===================================================="
+echo "      BocchiTheRockTheme Installer - v${VERSION}"
+echo "      Professional Deployment for FreshTomato"
+echo "===================================================="
 
+echo "[1/6] Verifying system environment..."
 if ! mount | grep -q "/jffs"; then
-    error_exit "JFFS partition not mounted. Please enable JFFS in settings."
+    echo "ERROR: JFFS partition not mounted."
+    exit 1
 fi
 
 FREE_RAM=$(df -k /tmp | awk 'NR==2 {print $4}')
 if [ "$FREE_RAM" -lt "$REQUIRED_SPACE_KB" ]; then
-    error_exit "Insufficient RAM. Need: 30MB | Found: $((FREE_RAM/1024))MB"
+    echo "ERROR: Insufficient RAM. Need: 30MB | Found: $((FREE_RAM/1024))MB"
+    exit 1
 fi
 
 # =================================================================
-# PHASE 2: PREPARATION
+# PHASE 2: CLEANING & MIRRORING
 # =================================================================
 if [ -d "$INSTALL_PATH" ]; then
-    log "Existing deployment found. Preparing for clean reinstall..."
+    echo "[2/6] Existing deployment found. Cleaning up..."
     umount -l /www 2>/dev/null
     rm -rf "$INSTALL_PATH"
 fi
 
-log "Mirroring system UI to JFFS storage..."
+echo "[3/6] Mirroring system UI to JFFS..."
 mkdir -p "$INSTALL_PATH"
 cp -a /www/. "$INSTALL_PATH/"
 rm -f "$INSTALL_PATH/default.css"
 
 # =================================================================
-# PHASE 3: SECURE ACQUISITION & EXTRACTION
+# PHASE 4: DOWNLOAD & EXTRACTION (Standard Wget)
 # =================================================================
-log "Creating secure workspace at $TEMP_WORKSPACE..."
+echo "[4/6] Creating secure workspace..."
+rm -rf "$TEMP_WORKSPACE"
 mkdir -p "$TEMP_WORKSPACE"
-cd "$TEMP_WORKSPACE" || exit
+cd "$TEMP_WORKSPACE"
 
-log "Downloading master repository..."
-wget --no-check-certificate -q --show-progress -L "$SOURCE_URL" -O master.tar.gz
-[ $? -ne 0 ] && error_exit "Network error during download."
+echo "Downloading master repository..."
+# Menggunakan wget standar FreshTomato
+wget --no-check-certificate "$SOURCE_URL" -O master.tar.gz
 
-log "Extracting repository data..."
-tar -xzf master.tar.gz || error_exit "Failed to decompress repository."
+if [ $? -ne 0 ]; then
+    echo "ERROR: Download failed. Check internet connection."
+    exit 1
+fi
 
-# GitHub extracts to: Fresh-Tomato-Theme-main/
-# Target tar location: Fresh-Tomato-Theme-main/BocchiTheRock/BocchiTheme.tar
+echo "Extracting repository data..."
+tar -xzf master.tar.gz
+
+# Mencari folder hasil ekstrak (nama biasanya: Fresh-Tomato-Theme-main)
 REPO_ROOT=$(ls -d */ | grep "Fresh-Tomato-Theme")
 TARGET_TAR="${REPO_ROOT}BocchiTheRock/BocchiTheme.tar"
 
 if [ ! -f "$TARGET_TAR" ]; then
-    error_exit "Target package not found at: $TARGET_TAR"
+    echo "ERROR: Target package BocchiTheme.tar not found at $TARGET_TAR"
+    exit 1
 fi
 
-log "Extracting theme assets from $TARGET_TAR..."
-tar -xf "$TARGET_TAR" -C "$INSTALL_PATH/" || error_exit "Asset extraction failed."
+echo "Deploying theme assets to JFFS..."
+tar -xf "$TARGET_TAR" -C "$INSTALL_PATH/"
+
+# Cleanup RAM
+cd /
+rm -rf "$TEMP_WORKSPACE"
 
 # =================================================================
-# PHASE 4: SYSTEM INTEGRATION & HARDENING
+# PHASE 5: PERSISTENCE & PERMISSIONS
 # =================================================================
-log "Hardening file permissions (CHMOD 644)..."
+echo "[5/6] Hardening permissions and boot sequence..."
 chmod 755 "$INSTALL_PATH"
 chmod 644 "$INSTALL_PATH"/*
 
-log "Updating NVRAM persistence sequence..."
-BOOT_SCRIPT="
-# --- ${APP_NAME} Startup ---
+# Menghapus entri lama dan memasukkan yang baru ke NVRAM
+CURRENT_INIT=$(nvram get script_init | sed "/# --- Bocchi Startup ---/,/fi/d")
+nvram set script_init="$CURRENT_INIT
+# --- Bocchi Startup ---
 sleep 10
 if [ -d $INSTALL_PATH ]; then
     chmod 755 $INSTALL_PATH
@@ -110,36 +108,26 @@ if [ -d $INSTALL_PATH ]; then
     mount --bind $INSTALL_PATH /www
     service httpd restart
 fi"
-
-# Clean duplicate boot entries
-CURRENT_INIT=$(nvram get script_init | sed "/# --- ${APP_NAME} Startup ---/,/fi/d")
-nvram set script_init="$CURRENT_INIT$BOOT_SCRIPT"
 nvram commit
 
-> Rachel:
 # =================================================================
-# PHASE 5: ACTIVATION & VALIDATION
+# PHASE 6: ACTIVATION
 # =================================================================
-log "Finalizing mount bind..."
+echo "[6/6] Finalizing mount and restarting Web Server..."
 umount -l /www 2>/dev/null
 mount --bind "$INSTALL_PATH" /www
 service httpd restart
 
-# Cleanup
-cd /
-rm -rf "$TEMP_WORKSPACE"
-
-# Final Asset Check
+# Verifikasi
 if [ -f "/www/bg.png" ]; then
-    echo -e "${GREEN}"
     echo "===================================================="
-    echo "         SUCCESS: THEME DEPLOYED GLOBALLY"
+
+> Rachel:
+echo "         SUCCESS: THEME DEPLOYED GLOBALLY"
     echo "===================================================="
-    echo -e "${NC}System Status: ${GREEN}Optimized${NC}"
-    echo -e "Web Server:    ${GREEN}Restarted${NC}"
-    echo -e "Background:    ${GREEN}Active (WebP-as-PNG)${NC}"
-    echo -e "\nAction required: Clear Browser Cache (CTRL+F5)"
+    echo " Action: Please Clear Browser Cache (CTRL+F5)"
     echo "===================================================="
 else
-    error_exit "Verification failed. bg.png not detected in /www"
+    echo "ERROR: Verification failed. Assets not found in /www"
+    exit 1
 fi
