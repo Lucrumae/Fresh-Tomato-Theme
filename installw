@@ -5,26 +5,33 @@
 # GLOBAL CONFIGURATION
 # =================================================================
 APP_NAME="BocchiTheRockTheme"
-VERSION="2026.1-PRO"
-SOURCE_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/BocchiTheRockTheme/BocchiTheme.tar"
+VERSION="2026.3-PRO"
+# URL Download otomatis repositori GitHub
+SOURCE_URL="https://github.com/Lucrumae/Fresh-Tomato-Theme/archive/refs/heads/main.tar.gz"
 INSTALL_PATH="/jffs/mywww"
 TEMP_WORKSPACE="/tmp/theme_deploy_$(date +%s)"
-REQUIRED_SPACE_KB=25600
-LOG_FILE="/tmp/theme_install.log"
+REQUIRED_SPACE_KB=30720 # 30MB Buffer
 
 # ANSI Colors for Professional UI
 CYAN='\033[0;36m'
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m' 
 
 # =================================================================
 # HELPER FUNCTIONS
 # =================================================================
 log() { echo -e "${CYAN}[$(date +%H:%M:%S)]${NC} $1"; }
-error_exit() { echo -e "${RED}[ERROR] $1${NC}"; exit 1; }
+error_exit() { 
+    echo -e "${RED}[ERROR] $1${NC}"
+    # Cleanup on failure
+    [ -d "$TEMP_WORKSPACE" ] && rm -rf "$TEMP_WORKSPACE"
+    exit 1 
+}
+
 print_header() {
+    clear
     echo -e "${CYAN}===================================================="
     echo -e "      ${GREEN}${APP_NAME} Installer - v${VERSION}${NC}"
     echo -e "      Enterprise Deployment for FreshTomato"
@@ -34,84 +41,66 @@ print_header() {
 # =================================================================
 # PHASE 1: PRE-FLIGHT CHECKS
 # =================================================================
-clear
 print_header
-
-# 1.1 Check JFFS Writable
 log "Verifying system environment..."
+
 if ! mount | grep -q "/jffs"; then
-    error_exit "JFFS partition not found or not mounted. Please enable JFFS in settings."
+    error_exit "JFFS partition not mounted. Please enable JFFS in settings."
 fi
 
-# 1.2 Check Resource Availability
 FREE_RAM=$(df -k /tmp | awk 'NR==2 {print $4}')
 if [ "$FREE_RAM" -lt "$REQUIRED_SPACE_KB" ]; then
-    error_exit "Insufficient RAM. Need: $((REQUIRED_SPACE_KB/1024))MB | Found: $((FREE_RAM/1024))MB"
+    error_exit "Insufficient RAM. Need: 30MB | Found: $((FREE_RAM/1024))MB"
 fi
 
-# 1.3 Conflict Handling
+# =================================================================
+# PHASE 2: PREPARATION
+# =================================================================
 if [ -d "$INSTALL_PATH" ]; then
-    echo -e "${YELLOW}[!] Previous installation detected at $INSTALL_PATH${NC}"
-    printf "    Perform clean reinstall? (y/n): "
-    read choice
-    case "$choice" in 
-        y|Y ) 
-            log "Purging old deployment..."
-            umount -l /www 2>/dev/null
-            rm -rf "$INSTALL_PATH" ;;
-        * ) 
-            log "Installation cancelled by user."; exit 0 ;;
-    esac
+    log "Existing deployment found. Preparing for clean reinstall..."
+    umount -l /www 2>/dev/null
+    rm -rf "$INSTALL_PATH"
 fi
 
-# =================================================================
-# PHASE 2: SYSTEM MIRRORING & PREPARATION
-# =================================================================
-log "Mirroring system UI to JFFS (Background process)..."
-mkdir -p "$INSTALL_PATH" || error_exit "Failed to create directory $INSTALL_PATH"
-cp -a /www/. "$INSTALL_PATH/" || error_exit "Mirroring failed."
-
-log "Removing legacy CSS assets..."
+log "Mirroring system UI to JFFS storage..."
+mkdir -p "$INSTALL_PATH"
+cp -a /www/. "$INSTALL_PATH/"
 rm -f "$INSTALL_PATH/default.css"
 
 # =================================================================
-# PHASE 3: SECURE ASSET DEPLOYMENT
+# PHASE 3: SECURE ACQUISITION & EXTRACTION
 # =================================================================
 log "Creating secure workspace at $TEMP_WORKSPACE..."
 mkdir -p "$TEMP_WORKSPACE"
 cd "$TEMP_WORKSPACE" || exit
 
-log "Fetching remote assets from repository..."
-wget --no-check-certificate -q --show-progress -U "Mozilla/5.0" "$SOURCE_URL" -O theme.tar
+log "Downloading master repository..."
+wget --no-check-certificate -q --show-progress -L "$SOURCE_URL" -O master.tar.gz
+[ $? -ne 0 ] && error_exit "Network error during download."
 
-if [ $? -ne 0 ]; then
-    error_exit "Download failed. Please check your internet connection."
+log "Extracting repository data..."
+tar -xzf master.tar.gz || error_exit "Failed to decompress repository."
+
+# GitHub extracts to: Fresh-Tomato-Theme-main/
+# Target tar location: Fresh-Tomato-Theme-main/BocchiTheRock/BocchiTheme.tar
+REPO_ROOT=$(ls -d */ | grep "Fresh-Tomato-Theme")
+TARGET_TAR="${REPO_ROOT}BocchiTheRock/BocchiTheme.tar"
+
+if [ ! -f "$TARGET_TAR" ]; then
+    error_exit "Target package not found at: $TARGET_TAR"
 fi
 
-log "Extracting and verifying payload..."
-tar -xf theme.tar || error_exit "Payload extraction failed (Corrupt file)."
-
-# Integritas Check: Pastikan file minimal ada
-if [ ! -f "default.css" ] || [ ! -f "bg.png" ]; then
-    error_exit "Incomplete package: 'default.css' or 'bg.png' missing."
-fi
-
-log "Injecting new assets into system mirror..."
-cp -af . "$INSTALL_PATH/"
-
-# Cleanup Workspace
-cd /
-rm -rf "$TEMP_WORKSPACE"
+log "Extracting theme assets from $TARGET_TAR..."
+tar -xf "$TARGET_TAR" -C "$INSTALL_PATH/" || error_exit "Asset extraction failed."
 
 # =================================================================
-# PHASE 4: PERMISSIONS & SYSTEM INTEGRATION
+# PHASE 4: SYSTEM INTEGRATION & HARDENING
 # =================================================================
-log "Hardening file permissions..."
+log "Hardening file permissions (CHMOD 644)..."
 chmod 755 "$INSTALL_PATH"
 chmod 644 "$INSTALL_PATH"/*
 
-> Rachel:
-log "Configuring boot persistence (NVRAM)..."
+log "Updating NVRAM persistence sequence..."
 BOOT_SCRIPT="
 # --- ${APP_NAME} Startup ---
 sleep 10
@@ -122,27 +111,35 @@ if [ -d $INSTALL_PATH ]; then
     service httpd restart
 fi"
 
-# Clean old script entries if any to prevent double-boot
+# Clean duplicate boot entries
 CURRENT_INIT=$(nvram get script_init | sed "/# --- ${APP_NAME} Startup ---/,/fi/d")
 nvram set script_init="$CURRENT_INIT$BOOT_SCRIPT"
 nvram commit
 
+> Rachel:
 # =================================================================
-# PHASE 5: ACTIVATION
+# PHASE 5: ACTIVATION & VALIDATION
 # =================================================================
-log "Applying system mount and restarting Web Server..."
+log "Finalizing mount bind..."
 umount -l /www 2>/dev/null
 mount --bind "$INSTALL_PATH" /www
 service httpd restart
 
-# Final Validation
-if mount | grep -q "$INSTALL_PATH on /www"; then
+# Cleanup
+cd /
+rm -rf "$TEMP_WORKSPACE"
+
+# Final Asset Check
+if [ -f "/www/bg.png" ]; then
     echo -e "${GREEN}"
     echo "===================================================="
-    echo "         DEPLOYMENT COMPLETED SUCCESSFULLY"
+    echo "         SUCCESS: THEME DEPLOYED GLOBALLY"
     echo "===================================================="
-    echo -e "${NC}Theme is now active. Please perform a Hard Refresh (Ctrl+F5)."
-    echo "Documentation: https://github.com/Lucrumae"
+    echo -e "${NC}System Status: ${GREEN}Optimized${NC}"
+    echo -e "Web Server:    ${GREEN}Restarted${NC}"
+    echo -e "Background:    ${GREEN}Active (WebP-as-PNG)${NC}"
+    echo -e "\nAction required: Clear Browser Cache (CTRL+F5)"
+    echo "===================================================="
 else
-    error_exit "Mount bind failed. System reverted to default."
+    error_exit "Verification failed. bg.png not detected in /www"
 fi
