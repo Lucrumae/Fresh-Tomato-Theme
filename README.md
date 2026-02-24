@@ -12,7 +12,7 @@ A Custom Theme For Fresh Tomato
 ## 🚀 Quick Installation
 Run this command in your Fresh Tomato device SSH terminal using PuTTY Windows or Termius Android
 -
-Make sure to run install in SSH terminal not System terminal because ./install give error while running through System terminal
+Make sure to run install in SSH terminal not System terminal because "./install" give error while running through System terminal
 ##
 wget https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/install
 
