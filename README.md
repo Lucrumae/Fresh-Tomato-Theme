@@ -11,7 +11,7 @@ A Custom Theme For Fresh Tomato
 
 ## 🚀 Quick Installation
 Run this command in your Fresh Tomato device SSH terminal using PuTTY Windows or Termius Android
-Make sure run install in SSH not system terminal because ./install give error while running 
+Make sure run install in SSH terminal not System terminal because ./install give error while running through System terminal
 ##
 wget https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/install
 
@@ -19,7 +19,7 @@ chmod +x install
 
 ./install
 
-## ⚠️ Clean Your Browser Cache After Install
+## ⚠️ Clean Your Browser Cache After Install (Ctrl+F5)
 ## If The Background Lag Wait Until The Gif Finishes Playing
 
 Only Tested On Linksys EA6300v1/EA6400 Fresh Tomato Version 2026.1
