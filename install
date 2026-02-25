@@ -33,7 +33,7 @@ fail() { echo -e "  ${RED}✘${NC}  $1"; }
 info() { echo -e "  ${CYAN}→${NC}  $1"; }
 warn() { echo -e "  ${YELLOW}⚠${NC}  $1"; }
 
-# BusyBox wget wrapper (tidak support --tries, pakai -T untuk timeout saja)
+# BusyBox wget wrapper
 do_wget() {
     wget --no-check-certificate -T 15 "$1" -O "$2" 2>/dev/null
 }
@@ -149,12 +149,39 @@ divider
 # =================================================================
 # PHASE 3: PREPARATION & MIRRORING
 # =================================================================
-echo -ne "  ${CYAN}[1/5]${NC}  Cleaning up previous installation...    "
-if mount | grep -q " /www "; then
-    umount -l /www 2>/dev/null
+echo -ne "  ${CYAN}[1/5]${NC}  Checking previous installation...       "
+
+if [ -d "$INSTALL_PATH" ] && [ "$(ls -A $INSTALL_PATH 2>/dev/null)" ]; then
+    # Instalasi sebelumnya terdeteksi
+    echo -e "${YELLOW}found${NC}"
+    echo ""
+    warn "A previous theme installation was detected at ${DIM}$INSTALL_PATH${NC}"
+    echo ""
+    printf "  Overwrite and continue? (y/n): "
+    read confirm < /dev/tty
+    echo ""
+    case "$confirm" in
+        y|Y)
+            echo -ne "  ${CYAN}[1/5]${NC}  Removing previous installation...       "
+            if mount | grep -q " /www "; then
+                umount -l /www 2>/dev/null
+            fi
+            rm -rf "$INSTALL_PATH"
+            echo -e "${BGREEN}done${NC}"
+            ;;
+        *)
+            info "Installation cancelled by user."
+            echo ""
+            exit 0
+            ;;
+    esac
+else
+    # Tidak ada instalasi sebelumnya, langsung lanjut
+    echo -e "${BGREEN}clean${NC}"
+    if mount | grep -q " /www "; then
+        umount -l /www 2>/dev/null
+    fi
 fi
-[ -d "$INSTALL_PATH" ] && rm -rf "$INSTALL_PATH"
-echo -e "${BGREEN}done${NC}"
 
 echo -ne "  ${CYAN}[2/5]${NC}  Mirroring /www to JFFS storage...       "
 mkdir -p "$INSTALL_PATH"
@@ -196,7 +223,6 @@ echo -e "${BGREEN}done${NC}"
 echo -ne "  ${CYAN}[5/5]${NC}  Configuring permissions & boot hooks... "
 
 chmod 755 "$INSTALL_PATH"
-# BusyBox find tidak support -type, pakai chmod langsung
 chmod 644 "$INSTALL_PATH"/* 2>/dev/null
 chmod 755 "$INSTALL_PATH"/*.sh 2>/dev/null
 chmod 755 "$INSTALL_PATH"/*.cgi 2>/dev/null
