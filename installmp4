@@ -263,26 +263,14 @@ fi
 
 SAFE_PATH=$(echo "$INSTALL_PATH" | tr -cd 'a-zA-Z0-9/_-')
 
-CURRENT_INIT=$(nvram get script_init | sed "/# --- Theme Startup ---/,/fi/d")
-nvram set script_init="$CURRENT_INIT
+CLEAN_INIT=$(nvram get script_init | awk '/# --- Theme Startup ---/{found=1} !found{print}')
+nvram set script_init="$CLEAN_INIT
 # --- Theme Startup ---
 sleep 10
-if [ -d $SAFE_PATH ]; then
-    chmod 755 $SAFE_PATH
-    chmod 644 $SAFE_PATH/* 2>/dev/null
-    chmod 755 $SAFE_PATH/*.sh 2>/dev/null
-    chmod 755 $SAFE_PATH/*.cgi 2>/dev/null
-    if [ -f $SAFE_PATH/tomato.js ]; then
-        if ! grep -q bg-video.js $SAFE_PATH/tomato.js; then
-            echo 'document.addEventListener(\"DOMContentLoaded\",function(){var s=document.createElement(\"script\");s.src=\"/bg-video.js\";document.head.appendChild(s);});' >> $SAFE_PATH/tomato.js
-        fi
-    fi
-    # Hanya mount jika belum ter-mount agar tidak menumpuk
-    if ! mount | grep -q "$SAFE_PATH on /www"; then
-        mount --bind $SAFE_PATH /www
-        service httpd restart
-    fi
-fi"
+[ -d $SAFE_PATH ] || exit 0
+grep -q bg-video.js $SAFE_PATH/tomato.js 2>/dev/null || echo 'document.addEventListener("DOMContentLoaded",function(){var s=document.createElement("script");s.src="/bg-video.js";document.head.appendChild(s);});' >> $SAFE_PATH/tomato.js
+mount | grep -q $SAFE_PATH || { mount --bind $SAFE_PATH /www && service httpd restart; }
+# --- End Theme Startup ---"
 nvram commit >/dev/null 2>&1
 
 mount --bind "$INSTALL_PATH" /www
