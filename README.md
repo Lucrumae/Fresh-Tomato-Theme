@@ -2,7 +2,7 @@
 
 # 🍅 FreshTomato Theme Collection
 
-**A collection of custom anime-themed UI themes for FreshTomato router firmware,
+**A collection of custom UI themes for FreshTomato router firmware,
 complete with a one-line installer.**
 
 ![GitHub repo size](https://img.shields.io/github/repo-size/Lucrumae/Fresh-Tomato-Theme?style=flat-square&color=ff4d8d)
