@@ -49,10 +49,17 @@ The installer will:
 
 After installation, press **Ctrl + F5** in your browser to clear the cache.
 
-> ⚠️ **To uninstall / revert to default**, run:
-> ```sh
-> umount -l /www && service httpd restart
-> ```
+---
+
+## 🗑️ Uninstall / Revert to Default
+
+Paste this single command into your router's SSH terminal to fully remove the theme:
+
+```sh
+umount -l /www && rm -rf /jffs/mywww && nvram set script_init="$(nvram get script_init | sed '/# --- Theme Startup ---/,/fi/d')" && nvram commit && service httpd restart
+```
+
+This will in order: unmount the theme, delete all theme files from JFFS, remove the boot hook from NVRAM, save NVRAM, and restart the web server. After running, press **Ctrl + F5** in your browser to confirm the default UI is restored. ✅
 
 ---
 
@@ -64,7 +71,7 @@ Want to contribute your own theme? Follow these steps:
 ```
 YourThemeName/
 ├── Theme.tar        ← all theme files packed inside
-└── preview.png      ← screenshot for the README (recommended: 1280×720)
+└── preview.png      ← screenshot for the README (recommended: 1280x720)
 ```
 
 **2. Pack your theme files** into `Theme.tar`:
@@ -74,6 +81,7 @@ tar -cf Theme.tar bg.gif default.css logol.png logor.png
 ```
 
 The tar archive should contain at minimum:
+
 | File | Description |
 |------|-------------|
 | `default.css` | Main stylesheet for the theme |
@@ -93,7 +101,7 @@ Aemeath Wuthering Waves|AemeathWutheringWavesTheme
 Your Theme Name|YourThemeName
 ```
 
-**4. Submit a Pull Request** and your theme will be available to everyone via the installer! 🎉
+**4. Submit a Pull Request** and your theme will be available to everyone via the installer!
 
 ---
 
