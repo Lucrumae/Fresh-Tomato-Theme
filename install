@@ -94,7 +94,7 @@ fi
 divider
 echo ""
 printf "  Select a theme (1-$total_themes): "
-read choice
+read choice < /dev/tty
 
 # Validasi input
 case "$choice" in
