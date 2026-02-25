@@ -8,6 +8,9 @@ LIST_FILE="ThemeList.txt"
 INSTALL_PATH="/jffs/mywww"
 TEMP_WORKSPACE="/tmp/theme_deploy"
 
+# File yang didownload langsung dari folder theme (tanpa tar)
+THEME_FILES="default.css logol.png logor.png bgmp4.gif"
+
 # ANSI Colors & Styles
 CYAN='\033[0;36m'
 BCYAN='\033[1;36m'
@@ -188,45 +191,70 @@ rm -f "$INSTALL_PATH/default.css"
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
-# PHASE 4: DOWNLOAD & DEPLOYMENT
+# PHASE 4: DOWNLOAD THEME FILES LANGSUNG (TANPA TAR)
 # =================================================================
-THEME_URL="$BASE_URL/$SELECTED_FOLDER/Theme.tar"
+THEME_BASE_URL="$BASE_URL/$SELECTED_FOLDER"
+failed_files=""
 
-echo -ne "  ${CYAN}[3/5]${NC}  Downloading theme package...            "
-do_wget "$THEME_URL" "$TEMP_WORKSPACE/Theme.tar"
+echo -e "  ${CYAN}[3/5]${NC}  Downloading theme files..."
+echo ""
 
-if [ $? -ne 0 ] || [ ! -s "$TEMP_WORKSPACE/Theme.tar" ]; then
+# Download bg-video.js dari root repo (shared semua tema)
+printf "        ${DIM}%-20s${NC} " "bg-video.js"
+do_wget "$BASE_URL/bg-video.js" "$INSTALL_PATH/bg-video.js"
+if [ $? -ne 0 ] || [ ! -s "$INSTALL_PATH/bg-video.js" ]; then
     echo -e "${RED}failed${NC}"
-    echo ""
-    fail "Could not download Theme.tar. Check the folder name in ThemeList.txt."
+    fail "Could not download bg-video.js from main branch."
     echo ""
     exit 1
 fi
-echo -e "${BGREEN}done${NC}"
+SIZE=$(ls -lh "$INSTALL_PATH/bg-video.js" | awk '{print $5}')
+echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
 
-echo -ne "  ${CYAN}[4/5]${NC}  Extracting theme assets...              "
-tar -xf "$TEMP_WORKSPACE/Theme.tar" -C "$INSTALL_PATH/" 2>/dev/null
-if [ $? -ne 0 ]; then
-    echo -e "${RED}failed${NC}"
+for FILE in $THEME_FILES; do
+    printf "        ${DIM}%-20s${NC} " "$FILE"
+    do_wget "$THEME_BASE_URL/$FILE" "$INSTALL_PATH/$FILE"
+    if [ $? -ne 0 ] || [ ! -s "$INSTALL_PATH/$FILE" ]; then
+        # File opsional (bg.gif, bgmp4.gif) tidak wajib ada
+        case "$FILE" in
+            bg.gif|bgmp4.gif)
+                echo -e "${DIM}skipped${NC}"
+                ;;
+            *)
+                echo -e "${RED}failed${NC}"
+                failed_files="$failed_files $FILE"
+                ;;
+        esac
+    else
+        SIZE=$(ls -lh "$INSTALL_PATH/$FILE" | awk '{print $5}')
+        echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+    fi
+done
+
+echo ""
+
+# Batalkan jika ada file wajib yang gagal
+if [ -n "$failed_files" ]; then
+    fail "Required files failed to download:$failed_files"
     echo ""
-    fail "Extraction failed. Theme.tar may be corrupted or in wrong format."
+    fail "Check folder name in ThemeList.txt or your internet connection."
     echo ""
     exit 1
 fi
-echo -e "${BGREEN}done${NC}"
 
 # =================================================================
-# PHASE 5: PERSISTENCE & ACTIVATION
+# PHASE 5: PERMISSIONS & BOOT HOOKS
 # =================================================================
-echo -ne "  ${CYAN}[5/5]${NC}  Configuring permissions & boot hooks... "
-
+echo -ne "  ${CYAN}[4/5]${NC}  Setting permissions...                  "
 chmod 755 "$INSTALL_PATH"
 chmod 644 "$INSTALL_PATH"/* 2>/dev/null
 chmod 755 "$INSTALL_PATH"/*.sh 2>/dev/null
 chmod 755 "$INSTALL_PATH"/*.cgi 2>/dev/null
+echo -e "${BGREEN}done${NC}"
+
+echo -ne "  ${CYAN}[5/5]${NC}  Configuring boot hooks...               "
 
 # Inject bg-video.js ke tomato.js agar load di semua halaman
-# Cek dulu agar tidak double inject
 if [ -f "$INSTALL_PATH/tomato.js" ]; then
     if ! grep -q "bg-video.js" "$INSTALL_PATH/tomato.js"; then
         echo 'document.addEventListener("DOMContentLoaded",function(){var s=document.createElement("script");s.src="/bg-video.js";document.head.appendChild(s);});' >> "$INSTALL_PATH/tomato.js"
@@ -235,7 +263,6 @@ fi
 
 SAFE_PATH=$(echo "$INSTALL_PATH" | tr -cd 'a-zA-Z0-9/_-')
 
-# Hapus boot hook lama jika ada, lalu tulis ulang yang baru
 CURRENT_INIT=$(nvram get script_init | sed "/# --- Theme Startup ---/,/fi/d")
 nvram set script_init="$CURRENT_INIT
 # --- Theme Startup ---
@@ -245,7 +272,6 @@ if [ -d $SAFE_PATH ]; then
     chmod 644 $SAFE_PATH/* 2>/dev/null
     chmod 755 $SAFE_PATH/*.sh 2>/dev/null
     chmod 755 $SAFE_PATH/*.cgi 2>/dev/null
-    # Re-inject bg-video.js setelah reboot jika hilang
     if [ -f $SAFE_PATH/tomato.js ]; then
         if ! grep -q bg-video.js $SAFE_PATH/tomato.js; then
             echo 'document.addEventListener(\"DOMContentLoaded\",function(){var s=document.createElement(\"script\");s.src=\"/bg-video.js\";document.head.appendChild(s);});' >> $SAFE_PATH/tomato.js
