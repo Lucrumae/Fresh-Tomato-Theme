@@ -16,14 +16,12 @@ complete with a one-line installer.**
 ## ✨ Themes
 
 ### 🎸 Bocchi The Rock
-> Pink & dark industrial aesthetic inspired by the anime *Bocchi the Rock!*
 
 ![Bocchi The Rock Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/BocchiTheRockTheme/preview.png)
 
 ---
 
 ### 🌊 Aemeath — Wuthering Waves
-> Deep dark theme featuring Aemeath from *Wuthering Waves*, with animated CPU usage bar and MP4 video background support.
 
 ![Aemeath Wuthering Waves Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/AemeathWutheringWavesTheme/preview.png)
 
