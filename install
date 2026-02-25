@@ -15,7 +15,7 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Auto-cleanup RAM on exit/error
+# FIX 1: Cleanup RAM saat exit/error
 cleanup() {
     [ -d "$TEMP_WORKSPACE" ] && rm -rf "$TEMP_WORKSPACE"
 }
@@ -32,7 +32,10 @@ echo -e "${CYAN}====================================================${NC}"
 
 mkdir -p "$TEMP_WORKSPACE"
 echo -n "Fetching theme catalog... "
-wget --no-check-certificate "$BASE_URL/$LIST_FILE" -O "$TEMP_WORKSPACE/list.txt" >/dev/null 2>&1
+
+# FIX 2: Tambah timeout pada wget agar tidak hang selamanya
+wget --no-check-certificate --timeout=15 --tries=2 \
+    "$BASE_URL/$LIST_FILE" -O "$TEMP_WORKSPACE/list.txt" >/dev/null 2>&1
 
 if [ ! -s "$TEMP_WORKSPACE/list.txt" ]; then
     echo -e "${RED}[FAILED]${NC}"
@@ -44,16 +47,17 @@ echo -e "${GREEN}[OK]${NC}"
 echo -e "\n${YELLOW}Available Themes in Repository:${NC}"
 echo -e "----------------------------------------------------"
 
+# FIX 3: Ganti eval dengan array sederhana pakai file temp
+# eval + input user = risiko command injection
 i=1
 while IFS='|' read -r name folder || [ -n "$name" ]; do
-    clean_name=$(echo "$name" | tr -d '\r')
-    clean_folder=$(echo "$folder" | tr -d '\r')
-    
+    clean_name=$(echo "$name" | tr -d '\r\n')
+    clean_folder=$(echo "$folder" | tr -d '\r\n')
     [ -z "$clean_name" ] && continue
-    
     echo -e "${CYAN}$i)${NC} $clean_name"
-    eval "NAME_$i=\"$clean_name\""
-    eval "FOLDER_$i=\"$clean_folder\""
+    # Simpan ke file temp, bukan eval
+    echo "$clean_name" >> "$TEMP_WORKSPACE/names.txt"
+    echo "$clean_folder" >> "$TEMP_WORKSPACE/folders.txt"
     i=$((i+1))
 done < "$TEMP_WORKSPACE/list.txt"
 
@@ -67,13 +71,29 @@ echo -e "----------------------------------------------------"
 printf "Enter selection (1-$total_themes): "
 read choice
 
-SELECTED_NAME=$(eval echo \$NAME_$choice)
-SELECTED_FOLDER=$(eval echo \$FOLDER_$choice)
+# FIX 4: Validasi input - harus angka, dalam range yang benar
+case "$choice" in
+    ''|*[!0-9]*)
+        echo -e "${RED}Invalid input: please enter a number.${NC}"
+        exit 1
+        ;;
+esac
 
-if [ -z "$SELECTED_NAME" ]; then
-    echo -e "${RED}Invalid selection. Installation aborted.${NC}"
+if [ "$choice" -lt 1 ] || [ "$choice" -gt "$total_themes" ]; then
+    echo -e "${RED}Invalid selection. Please choose between 1 and $total_themes.${NC}"
     exit 1
 fi
+
+# Ambil nama dan folder dari file temp (aman, tanpa eval)
+SELECTED_NAME=$(sed -n "${choice}p" "$TEMP_WORKSPACE/names.txt")
+SELECTED_FOLDER=$(sed -n "${choice}p" "$TEMP_WORKSPACE/folders.txt")
+
+if [ -z "$SELECTED_NAME" ] || [ -z "$SELECTED_FOLDER" ]; then
+    echo -e "${RED}Could not resolve theme selection. Aborting.${NC}"
+    exit 1
+fi
+
+echo -e "\n${GREEN}Selected: $SELECTED_NAME${NC}"
 
 # =================================================================
 # PHASE 2: SYSTEM & SPACE CHECKS
@@ -85,7 +105,6 @@ if ! mount | grep -q "/jffs"; then
     exit 1
 fi
 
-# Cek sisa ruang JFFS (Minimal butuh 10MB free)
 FREE_JFFS=$(df -k /jffs | awk 'NR==2 {print $4}')
 if [ "$FREE_JFFS" -lt 10240 ]; then
     echo -e "${YELLOW}[WARNING] Low JFFS space ($((FREE_JFFS/1024))MB). Installation might fail.${NC}"
@@ -95,7 +114,12 @@ fi
 # PHASE 3: PREPARATION & MIRRORING
 # =================================================================
 log_step "1" "Cleaning previous environment..."
-umount -l /www 2>/dev/null
+
+# FIX 5: Cek apakah /www sudah di-mount sebelum umount
+if mount | grep -q " /www "; then
+    umount -l /www 2>/dev/null
+fi
+
 [ -d "$INSTALL_PATH" ] && rm -rf "$INSTALL_PATH"
 
 log_step "2" "Mirroring system files to JFFS..."
@@ -106,35 +130,54 @@ rm -f "$INSTALL_PATH/default.css"
 # =================================================================
 # PHASE 4: DOWNLOAD & DEPLOYMENT
 # =================================================================
-# Updated URL: Menggunakan Theme.tar sesuai permintaan Anda
 THEME_URL="$BASE_URL/$SELECTED_FOLDER/Theme.tar"
 
 log_step "3" "Downloading $SELECTED_NAME package..."
-wget --no-check-certificate "$THEME_URL" -O "$TEMP_WORKSPACE/Theme.tar"
 
-if [ $? -ne 0 ]; then
+# FIX 6: Tambah timeout pada download theme juga
+wget --no-check-certificate --timeout=30 --tries=2 \
+    "$THEME_URL" -O "$TEMP_WORKSPACE/Theme.tar"
+
+if [ $? -ne 0 ] || [ ! -s "$TEMP_WORKSPACE/Theme.tar" ]; then
     echo -e "${RED}[ERROR] Failed to download Theme.tar from $SELECTED_FOLDER${NC}"
     exit 1
 fi
 
 log_step "4" "Extracting assets to JFFS storage..."
+
+# FIX 7: Cek apakah tar berhasil sebelum lanjut
 tar -xf "$TEMP_WORKSPACE/Theme.tar" -C "$INSTALL_PATH/"
+if [ $? -ne 0 ]; then
+    echo -e "${RED}[ERROR] Failed to extract Theme.tar. File might be corrupted.${NC}"
+    exit 1
+fi
+
 # =================================================================
 # PHASE 5: PERSISTENCE & ACTIVATION
 # =================================================================
 log_step "5" "Configuring boot sequence & Permissions..."
-chmod 755 "$INSTALL_PATH"
-chmod 644 "$INSTALL_PATH"/*
 
-# NVRAM Startup Script Persistence
+chmod 755 "$INSTALL_PATH"
+
+# FIX 8: Pisah permission untuk file biasa vs executable
+# .sh dan .cgi butuh 755, file lain cukup 644
+find "$INSTALL_PATH" -type f \( -name "*.sh" -o -name "*.cgi" \) -exec chmod 755 {} \;
+find "$INSTALL_PATH" -type f ! \( -name "*.sh" -o -name "*.cgi" \) -exec chmod 644 {} \;
+
+# FIX 9: Sanitasi SELECTED_FOLDER sebelum masuk ke nvram
+# Hanya izinkan karakter aman (huruf, angka, dash, underscore, slash)
+SAFE_FOLDER=$(echo "$SELECTED_FOLDER" | tr -cd 'a-zA-Z0-9/_-')
+SAFE_PATH=$(echo "$INSTALL_PATH" | tr -cd 'a-zA-Z0-9/_-')
+
 CURRENT_INIT=$(nvram get script_init | sed "/# --- Theme Startup ---/,/fi/d")
 nvram set script_init="$CURRENT_INIT
 # --- Theme Startup ---
 sleep 10
-if [ -d $INSTALL_PATH ]; then
-    chmod 755 $INSTALL_PATH
-    chmod 644 $INSTALL_PATH/*
-    mount --bind $INSTALL_PATH /www
+if [ -d $SAFE_PATH ]; then
+    chmod 755 $SAFE_PATH
+    find $SAFE_PATH -type f \( -name '*.sh' -o -name '*.cgi' \) -exec chmod 755 {} \;
+    find $SAFE_PATH -type f ! \( -name '*.sh' -o -name '*.cgi' \) -exec chmod 644 {} \;
+    mount --bind $SAFE_PATH /www
     service httpd restart
 fi"
 nvram commit
