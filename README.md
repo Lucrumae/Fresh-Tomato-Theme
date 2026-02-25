@@ -111,7 +111,7 @@ This will in order: unmount the theme, delete all theme files from JFFS, remove 
 | FreshTomato ARM | ✅ Tested |
 | FreshTomato MIPS | ⚠️ Untested |
 
-Tested on: **Cisco Linksys EA6400** (ARMv7, FreshTomato 2026.1)
+Tested on: **Cisco Linksys EA6300v1/EA6400** (ARMv7, FreshTomato 2026.1)
 
 ---
 
@@ -128,6 +128,5 @@ Tested on: **Cisco Linksys EA6400** (ARMv7, FreshTomato 2026.1)
 
 <div align="center">
 
-Made with ❤️ and too many page refresh.
-
+Personal Project For My Fresh Tomato Linksys EA6300v1/EA6400
 </div>
