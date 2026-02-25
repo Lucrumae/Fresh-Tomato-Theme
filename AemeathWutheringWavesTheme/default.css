@@ -1,0 +1,295 @@
+/* FreshTomato Theme v2026.1-Final-v27
+   Animated GIF Background Support & High Performance
+   >> Improved version: dark theme + typography matching Wuthering Waves background <<
+*/
+
+:root {
+    /* --- KONFIGURASI UTAMA --- */
+    --bg-image: url('bg.gif');
+    --logo-left: url('logol.png');
+    --logo-right: url('logor.png');
+
+    /* --- WARNA & TRANSPARANSI --- */
+    --text-primary: #e8e0d8;
+    --text-secondary: #a89f96;
+    --text-value: #f5f0eb;
+    --accent-red: #ff4d8d;
+    --accent-blue: #7ec8e3;
+    --panel-bg: rgba(10, 8, 12, 0.55);
+    --header-bg: rgba(10, 8, 12, 0.65);
+
+    /* --- UKURAN LOGO --- */
+    --size-left: auto 25px;
+    --size-right: auto 45px;
+
+    /* --- SPEED --- */
+    --transition-speed: 0.2s;
+}
+
+/* --- KEYFRAMES --- */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Animasi hue-rotate khusus untuk baris CPU Usage saja */
+@keyframes cpuHuePulse {
+    0%   { filter: hue-rotate(0deg) brightness(1.3); }
+    50%  { filter: hue-rotate(160deg) brightness(1.5); }
+    100% { filter: hue-rotate(0deg) brightness(1.3); }
+}
+
+/* --- GLOBAL LAYOUT --- */
+html {
+    background-color: transparent !important;
+}
+
+body {
+    background-color: transparent !important;
+    background: var(--bg-image) no-repeat center center fixed !important;
+    background-size: cover !important;
+    animation: fadeIn 0.5s ease-in;
+}
+
+/* --- LAYOUT --- */
+#container {
+    max-width: 50% !important;
+    margin-left: 0 !important;
+    margin-right: auto !important;
+}
+
+#content {
+    max-width: 100% !important;
+    margin-left: 0 !important;
+}
+
+/* --- PANELS --- */
+#container, #content, .section, .fields, fieldset, .box, .content,
+.message, .tomato-grid, .bwmg, .data-table {
+    background: var(--panel-bg) !important;
+    text-shadow: none !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* --- HEADER & DUAL LOGO --- */
+#header {
+    background-color: var(--header-bg) !important;
+    border-bottom: 2px solid var(--accent-red) !important;
+    height: 70px !important;
+    background-image: var(--logo-left), var(--logo-right) !important;
+    background-repeat: no-repeat, no-repeat !important;
+    background-position: left 20px center, right 20px center !important;
+    background-size: var(--size-left), var(--size-right) !important;
+}
+
+#header .title, #header .version { display: none !important; }
+
+/* --- SIDEBAR --- */
+#navi {
+    background: var(--panel-bg) !important;
+    border-right: 2px solid var(--accent-red) !important;
+    padding-right: 10px !important;
+}
+
+#navi a {
+    color: var(--text-secondary) !important;
+    font-weight: 600 !important;
+    transition: transform var(--transition-speed) ease;
+    will-change: transform;
+}
+
+#navi a:hover {
+    transform: translateX(5px);
+    color: var(--accent-blue) !important;
+}
+
+#navi a.indent1 { color: var(--accent-red) !important; font-weight: bold !important; }
+
+/* --- TYPOGRAPHY --- */
+body, div, p, li, label {
+    color: var(--text-primary) !important;
+    font-weight: 500 !important;
+}
+
+td:first-child, th {
+    color: var(--text-secondary) !important;
+    font-weight: 600 !important;
+}
+
+td:not(:first-child) {
+    color: var(--accent-blue) !important;
+    font-weight: 500 !important;
+}
+
+.section-title, legend, h1, h2, h3, h4 {
+    color: var(--accent-red) !important;
+    font-weight: bold !important;
+    letter-spacing: 0.03em !important;
+}
+
+.message b, td b, span b {
+    color: var(--accent-blue) !important;
+}
+
+a {
+    color: var(--accent-blue) !important;
+}
+a:hover {
+    color: var(--accent-red) !important;
+}
+
+span, .version, small {
+    color: var(--text-secondary) !important;
+}
+
+/* --- TABLE ROWS --- */
+tr:nth-child(even) td {
+    background: rgba(255, 255, 255, 0.04) !important;
+}
+tr:nth-child(odd) td {
+    background: rgba(255, 255, 255, 0.01) !important;
+}
+
+/* --- PROGRESS BAR: warna biru, animasi hue-rotate di baris CPU Usage --- */
+div.progress-bar {
+    background-color: var(--accent-blue) !important;
+}
+
+/* Animasi hanya pada td.content yang berisi progress-wrapper
+   pakai :has() — didukung Chrome/Edge modern */
+td.content:has(div.progress-wrapper) {
+    animation: cpuHuePulse 3s ease-in-out infinite !important;
+}
+
+/* --- BUTTONS --- */
+input[type="button"], input[type="submit"] {
+    background: var(--accent-red) !important;
+    border: none !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+    transition: opacity var(--transition-speed) ease;
+    border-radius: 4px !important;
+}
+
+input[type="button"]:hover, input[type="submit"]:hover {
+    opacity: 0.8;
+}
+
+/* --- INPUT FIELDS --- */
+input[type="text"], input[type="password"], select, textarea {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: var(--text-value) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: 3px !important;
+}
+
+/* --- FIX BACKGROUND PUTIH di halaman Logs & lainnya --- */
+/* Area log / textarea / pre */
+pre, code, .log, #syslog, textarea {
+    background: rgba(10, 8, 12, 0.75) !important;
+    color: var(--accent-blue) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Semua elemen yang masih putih */
+div, td, th, tr, table, tbody, thead,
+.fields, .section, fieldset, legend,
+.tomato-grid, .data-table {
+    background-color: transparent !important;
+}
+
+/* Override khusus untuk tabel log */
+table {
+    background: rgba(10, 8, 12, 0.55) !important;
+}
+
+tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.04) !important;
+}
+
+tr:nth-child(odd) {
+    background: rgba(10, 8, 12, 0.3) !important;
+}
+
+/* Input & select di halaman logs */
+input[type="text"], input[type="checkbox"],
+select, option {
+    background: rgba(10, 8, 12, 0.75) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+option {
+    background: #1a1a2e !important;
+}
+
+/* Scrollbar gelap */
+::-webkit-scrollbar {
+    width: 8px;
+    background: rgba(10, 8, 12, 0.5);
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 77, 141, 0.4);
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 77, 141, 0.7);
+}
+
+/* --- FIX BACKGROUND PUTIH di halaman Bandwidth --- */
+/* Area grafik utama */
+#bwm-graph, .bwm-graph, #chart, .chart,
+canvas, svg {
+    background: rgba(10, 8, 12, 0.75) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Tab interface bandwidth (LAN0, WAN0, dll) */
+.tab, .tabs, ul.tabs, ul.tabs li,
+.ui-tabs, .ui-tabs-nav, .ui-tabs-nav li,
+.ui-widget, .ui-widget-content, .ui-widget-header {
+    background: rgba(10, 8, 12, 0.65) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    color: var(--text-primary) !important;
+}
+
+.ui-tabs-nav li.ui-tabs-active,
+.ui-tabs-nav li:hover {
+    background: rgba(255, 77, 141, 0.3) !important;
+}
+
+/* Semua div yang masih punya background putih/terang */
+body > div, #content > div, #container > div {
+    background-color: transparent !important;
+}
+
+/* Area statistik RX/TX di bawah grafik */
+.bwm-stats, .bwm-footer, .tstats {
+    background: rgba(10, 8, 12, 0.65) !important;
+    color: var(--text-primary) !important;
+}
+
+/* --- FIX SVG BACKGROUND PUTIH di Bandwidth --- */
+.svg-rect {
+    fill: rgba(10, 8, 12, 0.85) !important;
+}
+
+svg {
+    background: transparent !important;
+}
+
+/* --- FIX TEKS SVG di grafik Bandwidth --- */
+svg text, svg tspan {
+    fill: var(--text-primary) !important;
+}
+
+/* Garis grid di grafik */
+svg line, svg path.grid {
+    stroke: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* --- GANTI WARNA TEKS SVG jadi pink --- */
+svg text, svg tspan {
+    fill: #ff4d8d !important;
+    font-weight: 600 !important;
+}
