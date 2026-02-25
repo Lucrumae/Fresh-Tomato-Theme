@@ -14,11 +14,7 @@ Run this command in your Fresh Tomato device using SSH terminal on PuTTY-Windows
 -
 Make sure to run install in SSH terminal not System terminal because "./install" give error while running through System terminal
 ##
-wget https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/install
-
-chmod +x install
-
-./install
+wget -O - https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/install | sh
 
 ## ⚠️ Clean Your Browser Cache After Install (Ctrl+F5)
 ## If The Background Lag Wait Until The Gif Finishes Playing
