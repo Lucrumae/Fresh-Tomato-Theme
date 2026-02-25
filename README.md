@@ -131,6 +131,6 @@ Tested on: **Cisco Linksys EA6400** (ARMv7, FreshTomato 2026.1)
 
 <div align="center">
 
-Made with ❤️ and too many router reboots.
+Made with ❤️ and too many page refresh.
 
 </div>
