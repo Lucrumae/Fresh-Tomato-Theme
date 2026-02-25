@@ -119,7 +119,6 @@ Tested on: **Cisco Linksys EA6300v1/EA6400** (ARMv7, FreshTomato 2026.1)
 
 | Role | Name |
 |------|------|
-| Theme author & installer | [Lucrumae](https://github.com/Lucrumae) |
 | Firmware | [FreshTomato](https://freshtomato.org) |
 | Bocchi The Rock | © Aki Hamaji / Aniplex |
 | Wuthering Waves — Aemeath | © Kuro Games |
