@@ -90,7 +90,7 @@ service httpd restart
 
 Then press **Ctrl + F5** in your browser. Your video should now play as the background.
 
-> **How it works:** The installer injects `bg-video.js` into `tomato.js`, which runs on every page. This script creates a `<video>` element with `type="video/mp4"` pointing to `bgmp4.gif` — the browser reads the MIME type from the tag, not the file extension, so it plays correctly. If the video fails to load, it automatically falls back to `bg.gif`.
+> **How it works:** The installer injects `bg-video.js` into `tomato.js`, which runs on every page. This script creates a `<video>` element with `type="video/mp4"` pointing to `bgmp4.gif` — the browser reads the MIME type from the tag, not the file extension, so it plays correctly.
 
 ---
 
