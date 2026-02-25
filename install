@@ -263,7 +263,7 @@ fi
 
 SAFE_PATH=$(echo "$INSTALL_PATH" | tr -cd 'a-zA-Z0-9/_-')
 
-CLEAN_INIT=$(nvram get script_init | awk '/# --- Theme Startup ---/{found=1} !found{print}')
+CLEAN_INIT=$(nvram get script_init | awk '/# --- Theme Startup ---/{found=1} found{next} {print} /# --- End Theme Startup ---/{found=0}')
 
 HOOK="# --- Theme Startup ---
 sleep 10
@@ -273,11 +273,11 @@ mount | grep -q $SAFE_PATH || { mount --bind $SAFE_PATH /www && service httpd re
 # --- End Theme Startup ---"
 
 if [ -n "$(nvram get script_init)" ]; then
-    # Ada isi — hapus hook lama lalu tambah hook baru
+    # Ada isi — hapus blok theme lama, sisakan konfigurasi custom user
     nvram set script_init="$CLEAN_INIT
 $HOOK"
 else
-    # Kosong — tulis hook langsung supaya persist saat reboot
+    # Kosong — tulis hook langsung
     nvram set script_init="$HOOK"
 fi
 nvram commit >/dev/null 2>&1
