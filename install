@@ -197,7 +197,7 @@ echo -ne "  ${CYAN}[5/5]${NC}  Configuring permissions & boot hooks... "
 
 chmod 755 "$INSTALL_PATH"
 # BusyBox find tidak support -type, pakai chmod langsung
-chmod 644 "$INSTALL_PATH"/*
+chmod 644 "$INSTALL_PATH"/* 2>/dev/null
 chmod 755 "$INSTALL_PATH"/*.sh 2>/dev/null
 chmod 755 "$INSTALL_PATH"/*.cgi 2>/dev/null
 
@@ -209,7 +209,7 @@ nvram set script_init="$CURRENT_INIT
 sleep 10
 if [ -d $SAFE_PATH ]; then
     chmod 755 $SAFE_PATH
-    chmod 644 $SAFE_PATH/*
+    chmod 644 $SAFE_PATH/* 2>/dev/null
     chmod 755 $SAFE_PATH/*.sh 2>/dev/null
     chmod 755 $SAFE_PATH/*.cgi 2>/dev/null
     mount --bind $SAFE_PATH /www
