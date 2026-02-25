@@ -23,7 +23,7 @@ complete with a one-line installer.**
 ---
 
 ### 🌊 Aemeath — Wuthering Waves
-> Deep dark theme featuring Aemeath from *Wuthering Waves*, with animated CPU usage bar.
+> Deep dark theme featuring Aemeath from *Wuthering Waves*, with animated CPU usage bar and MP4 video background support.
 
 ![Aemeath Wuthering Waves Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/AemeathWutheringWavesTheme/preview.png)
 
@@ -45,9 +45,52 @@ The installer will:
 2. Show you a list of available themes to choose from
 3. Mirror the system `/www` to JFFS for persistence
 4. Download and extract your chosen theme
-5. Mount and activate it — no reboot needed
+5. Inject the video background script into all pages
+6. Mount and activate — no reboot needed
 
 After installation, press **Ctrl + F5** in your browser to clear the cache.
+
+---
+
+## 🎬 How to Add a Custom MP4 Background
+
+FreshTomato's built-in web server (BusyBox httpd) does not support serving `.mp4` files directly because it has no MIME type for video. The workaround is to **rename your MP4 file to `.gif`** — the browser will still play it correctly as long as the correct MIME type is declared in the HTML.
+
+### Step 1 — Prepare your video file
+
+Compress and rename your video before uploading to the router. Recommended specs:
+- **Format:** MP4 (H.264)
+- **Resolution:** 1920x1080 or lower
+- **File size:** under 15MB for smooth loading
+- **Filename:** `bgmp4.gif` *(must use this name)*
+
+### Step 2 — Upload to the router via SCP
+
+From your PC, run:
+```sh
+scp bgmp4.gif root@192.168.1.1:/jffs/mywww/bgmp4.gif
+```
+
+Or copy directly if you already have SSH access to the router:
+```sh
+cp /path/to/your/video.mp4 /jffs/mywww/bgmp4.gif
+```
+
+### Step 3 — Verify the file is in place
+
+```sh
+ls -lh /jffs/mywww/bgmp4.gif
+```
+
+### Step 4 — Restart the web server
+
+```sh
+service httpd restart
+```
+
+Then press **Ctrl + F5** in your browser. Your video should now play as the background.
+
+> **How it works:** The installer injects `bg-video.js` into `tomato.js`, which runs on every page. This script creates a `<video>` element with `type="video/mp4"` pointing to `bgmp4.gif` — the browser reads the MIME type from the tag, not the file extension, so it plays correctly. If the video fails to load, it automatically falls back to `bg.gif`.
 
 ---
 
@@ -60,48 +103,6 @@ umount -l /www && rm -rf /jffs/mywww && nvram set script_init="$(nvram get scrip
 ```
 
 This will in order: unmount the theme, delete all theme files from JFFS, remove the boot hook from NVRAM, save NVRAM, and restart the web server. After running, press **Ctrl + F5** in your browser to confirm the default UI is restored. ✅
-
----
-
-## 🗂️ Adding a New Theme
-
-Want to contribute your own theme? Follow these steps:
-
-**1. Create a folder** in the root of this repository:
-```
-YourThemeName/
-├── Theme.tar        ← all theme files packed inside
-└── preview.png      ← screenshot for the README (recommended: 1280x720)
-```
-
-**2. Pack your theme files** into `Theme.tar`:
-```sh
-# From inside your theme folder
-tar -cf Theme.tar bg.gif default.css logol.png logor.png
-```
-
-The tar archive should contain at minimum:
-
-| File | Description |
-|------|-------------|
-| `default.css` | Main stylesheet for the theme |
-| `bg.gif` / `bg.png` | Background image or animation |
-| `logol.png` | Left header logo |
-| `logor.png` | Right header logo |
-
-**3. Register your theme** by adding a line to `ThemeList.txt`:
-```
-Theme Display Name|YourThemeFolderName
-```
-
-Example:
-```
-Bocchi The Rock|BocchiTheRockTheme
-Aemeath Wuthering Waves|AemeathWutheringWavesTheme
-Your Theme Name|YourThemeName
-```
-
-**4. Submit a Pull Request** and your theme will be available to everyone via the installer!
 
 ---
 
@@ -130,6 +131,6 @@ Tested on: **Cisco Linksys EA6400** (ARMv7, FreshTomato 2026.1)
 
 <div align="center">
 
-Made with ❤️ and too many page refresh.
+Made with ❤️ and too many router reboots.
 
 </div>
