@@ -196,8 +196,10 @@ echo -e "${BGREEN}done${NC}"
 echo -ne "  ${CYAN}[5/5]${NC}  Configuring permissions & boot hooks... "
 
 chmod 755 "$INSTALL_PATH"
-find "$INSTALL_PATH" -type f \( -name "*.sh" -o -name "*.cgi" \) -exec chmod 755 {} \;
-find "$INSTALL_PATH" -type f ! \( -name "*.sh" -o -name "*.cgi" \) -exec chmod 644 {} \;
+# BusyBox find tidak support -type, pakai chmod langsung
+chmod 644 "$INSTALL_PATH"/*
+chmod 755 "$INSTALL_PATH"/*.sh 2>/dev/null
+chmod 755 "$INSTALL_PATH"/*.cgi 2>/dev/null
 
 SAFE_PATH=$(echo "$INSTALL_PATH" | tr -cd 'a-zA-Z0-9/_-')
 
@@ -207,8 +209,9 @@ nvram set script_init="$CURRENT_INIT
 sleep 10
 if [ -d $SAFE_PATH ]; then
     chmod 755 $SAFE_PATH
-    find $SAFE_PATH -type f \( -name '*.sh' -o -name '*.cgi' \) -exec chmod 755 {} \;
-    find $SAFE_PATH -type f ! \( -name '*.sh' -o -name '*.cgi' \) -exec chmod 644 {} \;
+    chmod 644 $SAFE_PATH/*
+    chmod 755 $SAFE_PATH/*.sh 2>/dev/null
+    chmod 755 $SAFE_PATH/*.cgi 2>/dev/null
     mount --bind $SAFE_PATH /www
     service httpd restart
 fi"
