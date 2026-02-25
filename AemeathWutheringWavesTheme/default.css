@@ -1,11 +1,10 @@
 /* FreshTomato Theme v2026.1-Final-v27
-   Animated GIF Background Support & High Performance
+   MP4 Video Background Support (via bgmp4.gif workaround)
    >> Improved version: dark theme + typography matching Wuthering Waves background <<
 */
 
 :root {
     /* --- KONFIGURASI UTAMA --- */
-    --bg-image: url('bg.gif');
     --logo-left: url('logol.png');
     --logo-right: url('logor.png');
 
@@ -41,14 +40,26 @@
 
 /* --- GLOBAL LAYOUT --- */
 html {
-    background-color: transparent !important;
+    background-color: #0a080c !important;
 }
 
 body {
     background-color: transparent !important;
-    background: var(--bg-image) no-repeat center center fixed !important;
-    background-size: cover !important;
+    background-image: none !important;
     animation: fadeIn 0.5s ease-in;
+}
+
+/* --- VIDEO BACKGROUND --- */
+#bg-video {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1;
+    object-fit: cover;
+    object-position: center center;
+    pointer-events: none;
 }
 
 /* --- LAYOUT --- */
@@ -156,7 +167,7 @@ div.progress-bar {
 }
 
 /* Animasi hanya pada td.content yang berisi progress-wrapper
-   pakai :has() — didukung Chrome/Edge modern */
+   pakai :has() â€” didukung Chrome/Edge modern */
 td.content:has(div.progress-wrapper) {
     animation: cpuHuePulse 3s ease-in-out infinite !important;
 }
@@ -184,21 +195,18 @@ input[type="text"], input[type="password"], select, textarea {
 }
 
 /* --- FIX BACKGROUND PUTIH di halaman Logs & lainnya --- */
-/* Area log / textarea / pre */
 pre, code, .log, #syslog, textarea {
     background: rgba(10, 8, 12, 0.75) !important;
     color: var(--accent-blue) !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
-/* Semua elemen yang masih putih */
 div, td, th, tr, table, tbody, thead,
 .fields, .section, fieldset, legend,
 .tomato-grid, .data-table {
     background-color: transparent !important;
 }
 
-/* Override khusus untuk tabel log */
 table {
     background: rgba(10, 8, 12, 0.55) !important;
 }
@@ -211,7 +219,6 @@ tr:nth-child(odd) {
     background: rgba(10, 8, 12, 0.3) !important;
 }
 
-/* Input & select di halaman logs */
 input[type="text"], input[type="checkbox"],
 select, option {
     background: rgba(10, 8, 12, 0.75) !important;
@@ -237,14 +244,12 @@ option {
 }
 
 /* --- FIX BACKGROUND PUTIH di halaman Bandwidth --- */
-/* Area grafik utama */
 #bwm-graph, .bwm-graph, #chart, .chart,
 canvas, svg {
     background: rgba(10, 8, 12, 0.75) !important;
     border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
-/* Tab interface bandwidth (LAN0, WAN0, dll) */
 .tab, .tabs, ul.tabs, ul.tabs li,
 .ui-tabs, .ui-tabs-nav, .ui-tabs-nav li,
 .ui-widget, .ui-widget-content, .ui-widget-header {
@@ -258,12 +263,10 @@ canvas, svg {
     background: rgba(255, 77, 141, 0.3) !important;
 }
 
-/* Semua div yang masih punya background putih/terang */
 body > div, #content > div, #container > div {
     background-color: transparent !important;
 }
 
-/* Area statistik RX/TX di bawah grafik */
 .bwm-stats, .bwm-footer, .tstats {
     background: rgba(10, 8, 12, 0.65) !important;
     color: var(--text-primary) !important;
@@ -280,16 +283,10 @@ svg {
 
 /* --- FIX TEKS SVG di grafik Bandwidth --- */
 svg text, svg tspan {
-    fill: var(--text-primary) !important;
-}
-
-/* Garis grid di grafik */
-svg line, svg path.grid {
-    stroke: rgba(255, 255, 255, 0.15) !important;
-}
-
-/* --- GANTI WARNA TEKS SVG jadi pink --- */
-svg text, svg tspan {
     fill: #ff4d8d !important;
     font-weight: 600 !important;
+}
+
+svg line, svg path.grid {
+    stroke: rgba(255, 255, 255, 0.15) !important;
 }
