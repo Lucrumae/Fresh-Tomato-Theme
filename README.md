@@ -1,23 +1,127 @@
-# Fresh-Tomato-Theme
-A Custom Theme For Fresh Tomato
-## Screenshot Bocchi Theme
-<img width="1350" height="632" alt="BocchiTheme" src="https://github.com/user-attachments/assets/d1a2db8d-9763-42f5-8d95-549e8ed5e6e4" />
+<div align="center">
 
-## ⚠️ Important Requirements For Bocchi Theme
-* RAM: Minimum 25MB Ram Free (Required to process 20MB+ assets while installation).
-* JFFS: Must be Enabled & Formatted (Administration > JFFS).
-* Storage: Minimum 25MB free space on JFFS.
-* Why So Big? Because The Background Use 22 Second Gif
+# 🍅 FreshTomato Theme Collection
 
-## 🚀 Quick Installation
-Run this command in your Fresh Tomato device using SSH terminal on PuTTY-Windows or Termius-Android
--
-Make sure to run install in SSH terminal not System terminal because "./install" give error while running through System terminal
-##
+**A collection of custom anime-themed UI themes for FreshTomato router firmware,
+complete with a one-line installer.**
+
+![GitHub repo size](https://img.shields.io/github/repo-size/Lucrumae/Fresh-Tomato-Theme?style=flat-square&color=ff4d8d)
+![GitHub stars](https://img.shields.io/github/stars/Lucrumae/Fresh-Tomato-Theme?style=flat-square&color=7ec8e3)
+![License](https://img.shields.io/badge/license-MIT-pink?style=flat-square)
+
+</div>
+
+---
+
+## ✨ Themes
+
+### 🎸 Bocchi The Rock
+> Pink & dark industrial aesthetic inspired by the anime *Bocchi the Rock!*
+
+![Bocchi The Rock Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/BocchiTheRockTheme/preview.png)
+
+---
+
+### 🌊 Aemeath — Wuthering Waves
+> Deep dark theme featuring Aemeath from *Wuthering Waves*, with animated CPU usage bar.
+
+![Aemeath Wuthering Waves Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/AemeathWutheringWavesTheme/preview.png)
+
+---
+
+## 🚀 Installation
+
+> **Requirements:** FreshTomato firmware with JFFS partition enabled.
+> *(Administration → JFFS2 → Enable)*
+
+Paste this single command into your router's SSH terminal:
+
+```sh
 wget -O - https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/install | sh
+```
 
-## ⚠️ Clean Your Browser Cache After Install (Ctrl+F5)
-## If The Background Lag Wait Until The Gif Finishes Playing
+The installer will:
+1. Fetch the latest theme catalog from this repository
+2. Show you a list of available themes to choose from
+3. Mirror the system `/www` to JFFS for persistence
+4. Download and extract your chosen theme
+5. Mount and activate it — no reboot needed
 
-Only Tested On Linksys EA6300v1/EA6400 Fresh Tomato Version 2026.1
-## I Create This Repository For Personal Use You can try It On Your Own Fresh Tomato Device
+After installation, press **Ctrl + F5** in your browser to clear the cache.
+
+> ⚠️ **To uninstall / revert to default**, run:
+> ```sh
+> umount -l /www && service httpd restart
+> ```
+
+---
+
+## 🗂️ Adding a New Theme
+
+Want to contribute your own theme? Follow these steps:
+
+**1. Create a folder** in the root of this repository:
+```
+YourThemeName/
+├── Theme.tar        ← all theme files packed inside
+└── preview.png      ← screenshot for the README (recommended: 1280×720)
+```
+
+**2. Pack your theme files** into `Theme.tar`:
+```sh
+# From inside your theme folder
+tar -cf Theme.tar bg.gif default.css logol.png logor.png
+```
+
+The tar archive should contain at minimum:
+| File | Description |
+|------|-------------|
+| `default.css` | Main stylesheet for the theme |
+| `bg.gif` / `bg.png` | Background image or animation |
+| `logol.png` | Left header logo |
+| `logor.png` | Right header logo |
+
+**3. Register your theme** by adding a line to `ThemeList.txt`:
+```
+Theme Display Name|YourThemeFolderName
+```
+
+Example:
+```
+Bocchi The Rock|BocchiTheRockTheme
+Aemeath Wuthering Waves|AemeathWutheringWavesTheme
+Your Theme Name|YourThemeName
+```
+
+**4. Submit a Pull Request** and your theme will be available to everyone via the installer! 🎉
+
+---
+
+## 🛠️ Compatibility
+
+| Firmware | Status |
+|----------|--------|
+| FreshTomato ARM | ✅ Tested |
+| FreshTomato MIPS | ⚠️ Untested |
+| DD-WRT / OpenWrt | ❌ Not supported |
+
+Tested on: **Cisco Linksys EA6400** (ARMv7, FreshTomato 2026.1)
+
+---
+
+## 👤 Credits
+
+| Role | Name |
+|------|------|
+| Theme author & installer | [Lucrumae](https://github.com/Lucrumae) |
+| Firmware | [FreshTomato](https://freshtomato.org) |
+| Bocchi The Rock | © Aki Hamaji / Aniplex |
+| Wuthering Waves — Aemeath | © Kuro Games |
+
+---
+
+<div align="center">
+
+Made with ❤️ and too many router reboots.
+
+</div>
