@@ -60,7 +60,7 @@ FreshTomato's built-in web server (BusyBox httpd) does not support serving `.mp4
 
 Compress and rename your video before uploading to the router. Recommended specs:
 - **Format:** MP4 (H.264)
-- **Resolution:** 1920x1080 or lower
+- **Resolution:** 1280×720 or lower
 - **File size:** under 15MB for smooth loading
 - **Filename:** `bgmp4.gif` *(must use this name)*
 
@@ -99,7 +99,7 @@ Then press **Ctrl + F5** in your browser. Your video should now play as the back
 Paste this single command into your router's SSH terminal to fully remove the theme:
 
 ```sh
-umount -l /www && rm -rf /jffs/mywww && nvram set script_init="$(nvram get script_init | sed '/# --- Theme Startup ---/,/fi/d')" && nvram commit && service httpd restart
+umount -l /www && rm -rf /jffs/mywww && nvram set script_init="$(nvram get script_init | awk '/# --- Theme Startup ---/{found=1} !found{print}')" && nvram commit && service httpd restart
 ```
 
 This will in order: unmount the theme, delete all theme files from JFFS, remove the boot hook from NVRAM, save NVRAM, and restart the web server. After running, press **Ctrl + F5** in your browser to confirm the default UI is restored. ✅
@@ -112,7 +112,6 @@ This will in order: unmount the theme, delete all theme files from JFFS, remove 
 |----------|--------|
 | FreshTomato ARM | ✅ Tested |
 | FreshTomato MIPS | ⚠️ Untested |
-| DD-WRT / OpenWrt | ❌ Not supported |
 
 Tested on: **Cisco Linksys EA6400** (ARMv7, FreshTomato 2026.1)
 
@@ -131,6 +130,6 @@ Tested on: **Cisco Linksys EA6400** (ARMv7, FreshTomato 2026.1)
 
 <div align="center">
 
-Made with ❤️ and too many page refresh.
+Made with ❤️ and too many page restart.
 
 </div>
