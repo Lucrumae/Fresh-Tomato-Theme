@@ -201,12 +201,12 @@ echo -e "  ${CYAN}[3/5]${NC}  Downloading theme files..."
 echo ""
 
 # ---------------------------------------------------------------
-# Coba download adaptive.js dari main/Theme terlebih dahulu
+# Coba download adaptive.js dari folder tema (misal: Theme/AdaptiveTheme/)
 # Jika ada → pakai adaptive.js, jika tidak → fallback ke bg-video.js
 # ---------------------------------------------------------------
 VIDEO_SCRIPT="bg-video.js"
 printf "        ${DIM}%-20s${NC} " "adaptive.js"
-do_wget "$BASE_URL/Theme/adaptive.js" "$INSTALL_PATH/adaptive.js"
+do_wget "$THEME_BASE_URL/adaptive.js" "$INSTALL_PATH/adaptive.js"
 if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/adaptive.js" ]; then
     SIZE=$(ls -lh "$INSTALL_PATH/adaptive.js" | awk '{print $5}')
     echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
