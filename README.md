@@ -125,6 +125,7 @@ This will in order: unmount the theme, delete all theme files from JFFS, remove 
 | FreshTomato MIPS | ⚠️ Untested |
 
 I don't know if it works on other devices, but it should be universal. The thing is, I only have one device to test it on.
+
 Tested on: **Cisco Linksys EA6300v1/EA6400** (ARMv7, FreshTomato 2026.1)
 
 ---
