@@ -201,32 +201,47 @@ echo -e "  ${CYAN}[3/5]${NC}  Downloading theme files..."
 echo ""
 
 # ---------------------------------------------------------------
-# Coba download adaptive.js dari folder tema (misal: Theme/AdaptiveTheme/)
-# Jika ada → pakai adaptive.js, jika tidak → fallback ke bg-video.js
+# Prioritas deteksi script video:
+#   1. adaptiverealtime.js  (realtime sampling setiap 5 detik)
+#   2. adaptive.js          (sampling sekali saat play)
+#   3. bg-video.js          (fallback standar dari main)
 # ---------------------------------------------------------------
 VIDEO_SCRIPT="bg-video.js"
-printf "        ${DIM}%-20s${NC} " "adaptive.js"
-do_wget "$THEME_BASE_URL/adaptive.js" "$INSTALL_PATH/adaptive.js"
-if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/adaptive.js" ]; then
-    SIZE=$(ls -lh "$INSTALL_PATH/adaptive.js" | awk '{print $5}')
-    echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
-    VIDEO_SCRIPT="adaptive.js"
-    ok "adaptive.js detected — using adaptive mode"
-else
-    rm -f "$INSTALL_PATH/adaptive.js" 2>/dev/null
-    echo -e "${DIM}not found, falling back to bg-video.js${NC}"
 
-    # Download bg-video.js sebagai fallback
-    printf "        ${DIM}%-20s${NC} " "bg-video.js"
-    do_wget "$BASE_URL/bg-video.js" "$INSTALL_PATH/bg-video.js"
-    if [ $? -ne 0 ] || [ ! -s "$INSTALL_PATH/bg-video.js" ]; then
-        echo -e "${RED}failed${NC}"
-        fail "Could not download bg-video.js from main branch."
-        echo ""
-        exit 1
-    fi
-    SIZE=$(ls -lh "$INSTALL_PATH/bg-video.js" | awk '{print $5}')
+printf "        ${DIM}%-20s${NC} " "adaptiverealtime.js"
+do_wget "$THEME_BASE_URL/adaptiverealtime.js" "$INSTALL_PATH/adaptiverealtime.js"
+if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/adaptiverealtime.js" ]; then
+    SIZE=$(ls -lh "$INSTALL_PATH/adaptiverealtime.js" | awk '{print $5}')
     echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+    VIDEO_SCRIPT="adaptiverealtime.js"
+    ok "adaptiverealtime.js detected — using realtime adaptive mode"
+else
+    rm -f "$INSTALL_PATH/adaptiverealtime.js" 2>/dev/null
+    echo -e "${DIM}skipped${NC}"
+
+    printf "        ${DIM}%-20s${NC} " "adaptive.js"
+    do_wget "$THEME_BASE_URL/adaptive.js" "$INSTALL_PATH/adaptive.js"
+    if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/adaptive.js" ]; then
+        SIZE=$(ls -lh "$INSTALL_PATH/adaptive.js" | awk '{print $5}')
+        echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+        VIDEO_SCRIPT="adaptive.js"
+        ok "adaptive.js detected — using adaptive mode"
+    else
+        rm -f "$INSTALL_PATH/adaptive.js" 2>/dev/null
+        echo -e "${DIM}skipped${NC}"
+
+        # Fallback ke bg-video.js dari main
+        printf "        ${DIM}%-20s${NC} " "bg-video.js"
+        do_wget "$BASE_URL/bg-video.js" "$INSTALL_PATH/bg-video.js"
+        if [ $? -ne 0 ] || [ ! -s "$INSTALL_PATH/bg-video.js" ]; then
+            echo -e "${RED}failed${NC}"
+            fail "Could not download bg-video.js from main branch."
+            echo ""
+            exit 1
+        fi
+        SIZE=$(ls -lh "$INSTALL_PATH/bg-video.js" | awk '{print $5}')
+        echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+    fi
 fi
 
 # Download file tema
