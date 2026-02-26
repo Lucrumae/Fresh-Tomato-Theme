@@ -1,330 +1,117 @@
 /* adaptive.js — FreshTomato Adaptive Theme Engine
-   - Inject video bgmp4.gif sebagai background fullscreen
-   - Sample warna dominan dari frame pertama video
-   - Generate seluruh palet warna otomatis dengan jaminan kontras terbaca
+   - Sample warna sekali saat video play
+   - Mengutamakan warna cerah & kontras (WCAG)
+   - Controls muncul saat kursor dekat pojok kanan bawah
 */
 (function () {
 
-    // ---------------------------------------------------------------
-    // INJECT CSS #bg-video via JS agar pasti applied
-    // ---------------------------------------------------------------
-    var style = document.createElement('style');
-    style.id = 'adaptive-base';
-    style.textContent =
-        '#bg-video{' +
-            'position:fixed;top:0;left:0;' +
-            'width:100vw;height:100vh;' +
-            'z-index:-1;object-fit:cover;' +
-            'object-position:center center;' +
-            'pointer-events:none;' +
-        '}';
-    document.head.appendChild(style);
+    var vidStyle = document.createElement('style');
+    vidStyle.textContent = '#bg-video{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:-1;object-fit:cover;object-position:center center;pointer-events:none;}';
+    document.head.appendChild(vidStyle);
 
-    // ---------------------------------------------------------------
-    // BUAT ELEMEN VIDEO
-    // ---------------------------------------------------------------
     var vid = document.createElement('video');
-    vid.id          = 'bg-video';
-    vid.autoplay    = true;
-    vid.loop        = true;
-    vid.muted       = true;
-    vid.playsInline = true;
-    vid.setAttribute('playsinline', '');
-    vid.crossOrigin = 'anonymous';
-
-    var src = document.createElement('source');
-    src.src  = '/bgmp4.gif';
-    src.type = 'video/mp4';
+    vid.id='bg-video'; vid.autoplay=vid.loop=vid.muted=vid.playsInline=true;
+    vid.setAttribute('playsinline',''); vid.crossOrigin='anonymous';
+    var src=document.createElement('source');
+    src.src='/bgmp4.gif'; src.type='video/mp4';
     vid.appendChild(src);
-
-    function insertVideo() {
-        if (document.body) {
-            document.body.insertBefore(vid, document.body.firstChild);
-        } else {
-            document.addEventListener('DOMContentLoaded', function () {
-                document.body.insertBefore(vid, document.body.firstChild);
-            });
-        }
-    }
+    function insertVideo(){if(document.body)document.body.insertBefore(vid,document.body.firstChild);else document.addEventListener('DOMContentLoaded',function(){document.body.insertBefore(vid,document.body.firstChild);});}
     insertVideo();
 
-    // ---------------------------------------------------------------
-    // UTILITY: Konversi RGB ke HSL
-    // ---------------------------------------------------------------
-    function rgbToHsl(r, g, b) {
-        r /= 255; g /= 255; b /= 255;
-        var max = Math.max(r, g, b), min = Math.min(r, g, b);
-        var h, s, l = (max + min) / 2;
-        if (max === min) {
-            h = s = 0;
-        } else {
-            var d = max - min;
-            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-            switch (max) {
-                case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-                case g: h = ((b - r) / d + 2) / 6; break;
-                case b: h = ((r - g) / d + 4) / 6; break;
-            }
-        }
-        return [h * 360, s * 100, l * 100];
-    }
+    function rgbToHsl(r,g,b){r/=255;g/=255;b/=255;var max=Math.max(r,g,b),min=Math.min(r,g,b),h,s,l=(max+min)/2;if(max===min){h=s=0;}else{var d=max-min;s=l>0.5?d/(2-max-min):d/(max+min);switch(max){case r:h=((g-b)/d+(g<b?6:0))/6;break;case g:h=((b-r)/d+2)/6;break;case b:h=((r-g)/d+4)/6;break;}}return[h*360,s*100,l*100];}
+    function hslToRgb(h,s,l){h/=360;s/=100;l/=100;var r,g,b;if(s===0){r=g=b=l;}else{var q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;function hue2rgb(t){if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<0.5)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;}r=hue2rgb(h+1/3);g=hue2rgb(h);b=hue2rgb(h-1/3);}return[Math.round(r*255),Math.round(g*255),Math.round(b*255)];}
+    function relLum(r,g,b){function lin(c){c/=255;return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4);}return 0.2126*lin(r)+0.7152*lin(g)+0.0722*lin(b);}
+    function cr(l1,l2){var a=Math.max(l1,l2),b=Math.min(l1,l2);return(a+0.05)/(b+0.05);}
+    function bestText(r,g,b){return cr(1.0,relLum(r,g,b))>=cr(0.0,relLum(r,g,b))?[255,255,255]:[0,0,0];}
+    function ensureContrast(fr,fg,fb,br,bg,bb,min){min=min||4.5;var bl=relLum(br,bg,bb);if(cr(relLum(fr,fg,fb),bl)>=min)return[fr,fg,fb];var hsl=rgbToHsl(fr,fg,fb),h=hsl[0],s=hsl[1],l=hsl[2],rgb;for(var li=l;li<=98;li+=2){rgb=hslToRgb(h,s,li);if(cr(relLum(rgb[0],rgb[1],rgb[2]),bl)>=min)return rgb;}for(var ld=l;ld>=2;ld-=2){rgb=hslToRgb(h,s,ld);if(cr(relLum(rgb[0],rgb[1],rgb[2]),bl)>=min)return rgb;}return bestText(br,bg,bb);}
+    function rgb(c){return'rgb('+c[0]+','+c[1]+','+c[2]+')';}
+    function rgba(c,a){return'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')';}
+    function set(k,v){document.documentElement.style.setProperty(k,v);}
+    function applyPalette(r,g,b){var hsl=rgbToHsl(r,g,b),hue=hsl[0],sat=hsl[1],lum=hsl[2];var isDark=lum<50;var sat2=Math.max(sat,50);var pL=isDark?Math.min(lum+10,25):Math.max(lum-10,75);var hL=isDark?Math.min(lum+5,18):Math.max(lum-5,82);var panelRgb=hslToRgb(hue,Math.min(sat2,45),pL);var headerRgb=hslToRgb(hue,Math.min(sat2,50),hL);var accentRgb=hslToRgb(hue,Math.max(sat2,60),isDark?70:40);var accent2=hslToRgb((hue+30)%360,Math.max(sat2,55),isDark?75:35);var accentHl=hslToRgb(hue,Math.max(sat2,50),isDark?88:25);var bgFb=hslToRgb(hue,Math.min(sat,35),isDark?8:92);var eBgR=Math.round(panelRgb[0]*0.28+bgFb[0]*0.72);var eBgG=Math.round(panelRgb[1]*0.28+bgFb[1]*0.72);var eBgB=Math.round(panelRgb[2]*0.28+bgFb[2]*0.72);var tP=ensureContrast(isDark?250:15,isDark?245:10,isDark?235:8,eBgR,eBgG,eBgB,5.0);var tS=ensureContrast(accentRgb[0],accentRgb[1],accentRgb[2],eBgR,eBgG,eBgB,4.5);var tV=ensureContrast(accent2[0],accent2[1],accent2[2],eBgR,eBgG,eBgB,4.5);var aSec=ensureContrast(accent2[0],accent2[1],accent2[2],eBgR,eBgG,eBgB,4.5);var aHl=ensureContrast(accentHl[0],accentHl[1],accentHl[2],eBgR,eBgG,eBgB,3.5);var logB=isDark?[255,250,235]:[10,6,3];var logC=bestText(logB[0],logB[1],logB[2]);var inpB=hslToRgb(hue,Math.min(sat*0.25,12),isDark?94:10);var inpC=bestText(inpB[0],inpB[1],inpB[2]);var prog=hslToRgb((hue+15)%360,Math.max(sat2,65),isDark?72:38);var svgT=ensureContrast(accentRgb[0],accentRgb[1],accentRgb[2],eBgR,eBgG,eBgB,4.5);set('--bg-fallback',rgb(bgFb));set('--panel-bg',rgba(panelRgb,0.28));set('--header-bg',rgba(headerRgb,0.60));set('--log-bg',rgb(logB));set('--bwm-bg',rgba(panelRgb,0.07));set('--tab-bg',rgba(headerRgb,0.35));set('--text-primary',rgb(tP));set('--text-secondary',rgb(tS));set('--text-value',rgb(tV));set('--log-color',rgb(logC));set('--tab-text',rgb(tP));set('--accent-primary',rgba(accentRgb,0.22));set('--accent-secondary',rgb(aSec));set('--accent-highlight',rgb(aHl));set('--link-color',rgb(tS));set('--link-hover-color',rgb(aHl));set('--btn-bg',rgba(accentRgb,0.22));set('--btn-color',rgb(tP));set('--progress-color',rgb(prog));set('--input-bg',rgba(inpB,0.85));set('--input-color',rgb(inpC));set('--input-border',rgba(accentRgb,0.25));set('--svg-text-color',rgb(svgT));set('--svg-grid-stroke',rgba(accentRgb,0.15));set('--bwm-border',rgba(accentRgb,0.18));set('--svg-bg',rgba(headerRgb,0.30));set('--tab-active-bg',rgba(accentRgb,0.20));set('--row-even',rgba(accentRgb,0.06));set('--row-odd',rgba(accentRgb,0.02));set('--scrollbar-track',rgba(accentRgb,0.05));set('--scrollbar-thumb',rgba(accentRgb,0.40));set('--scrollbar-hover',rgba(accentRgb,0.65));document.documentElement.style.backgroundColor=rgb(bgFb);}
 
-    // HSL ke RGB string
-    function hslToRgb(h, s, l) {
-        h /= 360; s /= 100; l /= 100;
-        var r, g, b;
-        if (s === 0) {
-            r = g = b = l;
-        } else {
-            var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-            var p = 2 * l - q;
-            function hue2rgb(t) {
-                if (t < 0) t += 1;
-                if (t > 1) t -= 1;
-                if (t < 1/6) return p + (q - p) * 6 * t;
-                if (t < 1/2) return q;
-                if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-                return p;
-            }
-            r = hue2rgb(h + 1/3);
-            g = hue2rgb(h);
-            b = hue2rgb(h - 1/3);
-        }
-        return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
-    }
-
-    // Luminance relatif (WCAG)
-    function relativeLuminance(r, g, b) {
-        var rs = r/255, gs = g/255, bs = b/255;
-        function lin(c) { return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); }
-        return 0.2126*lin(rs) + 0.7152*lin(gs) + 0.0722*lin(bs);
-    }
-
-    // Rasio kontras WCAG (min 4.5 untuk teks normal)
-    function contrastRatio(l1, l2) {
-        var lighter = Math.max(l1, l2);
-        var darker  = Math.min(l1, l2);
-        return (lighter + 0.05) / (darker + 0.05);
-    }
-
-    // Cari warna teks (hitam/putih) yang paling kontras terhadap bg
-    function bestTextColor(bgR, bgG, bgB) {
-        var bgLum   = relativeLuminance(bgR, bgG, bgB);
-        var whiteLum = 1.0;
-        var blackLum = 0.0;
-        var whiteContrast = contrastRatio(whiteLum, bgLum);
-        var blackContrast = contrastRatio(blackLum, bgLum);
-        return whiteContrast >= blackContrast ? [255, 255, 255] : [0, 0, 0];
-    }
-
-    // Pastikan warna teks cukup kontras, adjust lightness jika perlu
-    function ensureContrast(fgR, fgG, fgB, bgR, bgG, bgB, minRatio) {
-        minRatio = minRatio || 4.5;
-        var bgLum = relativeLuminance(bgR, bgG, bgB);
-        var fgLum = relativeLuminance(fgR, fgG, fgB);
-
-        if (contrastRatio(fgLum, bgLum) >= minRatio) {
-            return [fgR, fgG, fgB]; // sudah cukup kontras
-        }
-
-        // Tentukan arah penyesuaian: terangkan atau gelapkan
-        var hsl = rgbToHsl(fgR, fgG, fgB);
-        var h = hsl[0], s = hsl[1], l = hsl[2];
-
-        // Coba terangkan dulu
-        for (var li = l; li <= 98; li += 2) {
-            var rgb = hslToRgb(h, s, li);
-            if (contrastRatio(relativeLuminance(rgb[0],rgb[1],rgb[2]), bgLum) >= minRatio) {
-                return rgb;
-            }
-        }
-        // Coba gelapkan
-        for (var ld = l; ld >= 2; ld -= 2) {
-            var rgb2 = hslToRgb(h, s, ld);
-            if (contrastRatio(relativeLuminance(rgb2[0],rgb2[1],rgb2[2]), bgLum) >= minRatio) {
-                return rgb2;
-            }
-        }
-        // Fallback ke hitam/putih
-        return bestTextColor(bgR, bgG, bgB);
-    }
-
-    // ---------------------------------------------------------------
-    // COLOR SAMPLING — sekali saat video play
-    // ---------------------------------------------------------------
-    vid.addEventListener('playing', function onPlay() {
+    vid.addEventListener('playing', function onPlay(){
         vid.removeEventListener('playing', onPlay);
-
-        try {
-            // Sample dari 9 zona berbeda (3x3 grid) untuk hasil lebih akurat
-            var cw = 96, ch = 54;
-            var canvas = document.createElement('canvas');
-            canvas.width = cw; canvas.height = ch;
-            var ctx = canvas.getContext('2d');
-            ctx.drawImage(vid, 0, 0, cw, ch);
-            var pixels = ctx.getImageData(0, 0, cw, ch).data;
-
-            var r = 0, g = 0, b = 0, count = 0;
-            for (var i = 0; i < pixels.length; i += 4) {
-                var pr = pixels[i], pg = pixels[i+1], pb = pixels[i+2];
-                var br = (pr + pg + pb) / 3;
-                if (br < 15 || br > 240) continue; // skip terlalu gelap/terang
-                r += pr; g += pg; b += pb; count++;
-            }
-            if (count === 0) return;
-
-            // Warna rata-rata dominan dari video
-            var dr = Math.round(r / count);
-            var dg = Math.round(g / count);
-            var db = Math.round(b / count);
-
-            var hsl     = rgbToHsl(dr, dg, db);
-            var hue     = hsl[0];
-            var sat     = hsl[1];
-            var lum     = hsl[2];
-            var isDark  = lum < 50;
-
-            // ---------------------------------------------------------
-            // GENERATE PALET dari hue yang ditemukan
-            // ---------------------------------------------------------
-
-            // Panel: hue yang sama tapi sangat gelap & transparan
-            var panelL   = isDark ? Math.min(lum + 8, 22)  : Math.max(lum - 8, 78);
-            var panelRgb = hslToRgb(hue, Math.min(sat, 40), panelL);
-            var panelBg  = 'rgba('+panelRgb[0]+','+panelRgb[1]+','+panelRgb[2]+',0.28)';
-
-            // Header: lebih pekat dari panel
-            var headerL   = isDark ? Math.min(lum + 4, 16) : Math.max(lum - 4, 84);
-            var headerRgb = hslToRgb(hue, Math.min(sat, 45), headerL);
-            var headerBg  = 'rgba('+headerRgb[0]+','+headerRgb[1]+','+headerRgb[2]+',0.60)';
-
-            // Accent primary: warna hidup dari hue video
-            var accentRgb = hslToRgb(hue, Math.max(sat, 55), isDark ? 65 : 45);
-            // Accent secondary: hue +30 (analogous)
-            var accent2Rgb = hslToRgb((hue + 30) % 360, Math.max(sat, 50), isDark ? 72 : 38);
-            // Accent highlight: lebih terang/muda
-            var accentHlRgb = hslToRgb(hue, Math.max(sat, 45), isDark ? 82 : 30);
-
-            // Panel background yang "dirasakan" (untuk keperluan kontras teks)
-            // Campurkan panel rgba dengan bg fallback
-            var bgFallbackRgb = hslToRgb(hue, Math.min(sat, 30), isDark ? 10 : 90);
-            var effectiveBgR = Math.round(panelRgb[0] * 0.28 + bgFallbackRgb[0] * 0.72);
-            var effectiveBgG = Math.round(panelRgb[1] * 0.28 + bgFallbackRgb[1] * 0.72);
-            var effectiveBgB = Math.round(panelRgb[2] * 0.28 + bgFallbackRgb[2] * 0.72);
-
-            // Text colors — dijamin kontras minimum 4.5:1 terhadap effective bg
-            var textPrimaryRaw   = isDark ? [245, 238, 225] : [20, 12, 5];
-            var textPrimary      = ensureContrast(
-                textPrimaryRaw[0], textPrimaryRaw[1], textPrimaryRaw[2],
-                effectiveBgR, effectiveBgG, effectiveBgB, 5.0
-            );
-
-            var textSecondaryRaw = accentRgb;
-            var textSecondary    = ensureContrast(
-                textSecondaryRaw[0], textSecondaryRaw[1], textSecondaryRaw[2],
-                effectiveBgR, effectiveBgG, effectiveBgB, 4.5
-            );
-
-            var textValueRaw  = accent2Rgb;
-            var textValue     = ensureContrast(
-                textValueRaw[0], textValueRaw[1], textValueRaw[2],
-                effectiveBgR, effectiveBgG, effectiveBgB, 4.5
-            );
-
-            var accentSecondary = ensureContrast(
-                accent2Rgb[0], accent2Rgb[1], accent2Rgb[2],
-                effectiveBgR, effectiveBgG, effectiveBgB, 4.5
-            );
-
-            var accentHighlight = ensureContrast(
-                accentHlRgb[0], accentHlRgb[1], accentHlRgb[2],
-                effectiveBgR, effectiveBgG, effectiveBgB, 3.5
-            );
-
-            // Log background: harus SANGAT kontras karena opaque
-            var logBgRgb    = isDark ? [255, 248, 230] : [15, 8, 5];
-            var logColorRgb = bestTextColor(logBgRgb[0], logBgRgb[1], logBgRgb[2]);
-
-            // Input background
-            var inputBgRgb = hslToRgb(hue, Math.min(sat * 0.3, 15), isDark ? 92 : 12);
-            var inputColor = bestTextColor(inputBgRgb[0], inputBgRgb[1], inputBgRgb[2]);
-
-            // Border accent
-            var borderAlpha = 0.22;
-            var accentBorder = 'rgba('+accentRgb[0]+','+accentRgb[1]+','+accentRgb[2]+','+borderAlpha+')';
-
-            // Progress bar
-            var progressRgb = hslToRgb((hue + 15) % 360, Math.max(sat, 60), isDark ? 68 : 42);
-
-            // Row alternating
-            var rowEven = 'rgba('+accentRgb[0]+','+accentRgb[1]+','+accentRgb[2]+',0.06)';
-            var rowOdd  = 'rgba('+accentRgb[0]+','+accentRgb[1]+','+accentRgb[2]+',0.02)';
-
-            // SVG
-            var svgTextRgb = ensureContrast(
-                accentRgb[0], accentRgb[1], accentRgb[2],
-                effectiveBgR, effectiveBgG, effectiveBgB, 4.5
-            );
-
-            // Scrollbar
-            var scrollThumb = 'rgba('+accentRgb[0]+','+accentRgb[1]+','+accentRgb[2]+',0.40)';
-            var scrollHover = 'rgba('+accentRgb[0]+','+accentRgb[1]+','+accentRgb[2]+',0.65)';
-
-            // ---------------------------------------------------------
-            // SET semua CSS variables sekaligus
-            // ---------------------------------------------------------
-            var R = document.documentElement;
-            function set(k, v) { R.style.setProperty(k, v); }
-
-            set('--bg-fallback',       'rgb('+bgFallbackRgb[0]+','+bgFallbackRgb[1]+','+bgFallbackRgb[2]+')');
-            set('--panel-bg',          panelBg);
-            set('--header-bg',         headerBg);
-            set('--log-bg',            'rgb('+logBgRgb[0]+','+logBgRgb[1]+','+logBgRgb[2]+')');
-            set('--bwm-bg',            'rgba('+panelRgb[0]+','+panelRgb[1]+','+panelRgb[2]+',0.07)');
-            set('--tab-bg',            'rgba('+headerRgb[0]+','+headerRgb[1]+','+headerRgb[2]+',0.35)');
-
-            set('--text-primary',      'rgb('+textPrimary[0]+','+textPrimary[1]+','+textPrimary[2]+')');
-            set('--text-secondary',    'rgb('+textSecondary[0]+','+textSecondary[1]+','+textSecondary[2]+')');
-            set('--text-value',        'rgb('+textValue[0]+','+textValue[1]+','+textValue[2]+')');
-            set('--log-color',         'rgb('+logColorRgb[0]+','+logColorRgb[1]+','+logColorRgb[2]+')');
-            set('--tab-text',          'rgb('+textPrimary[0]+','+textPrimary[1]+','+textPrimary[2]+')');
-
-            set('--accent-primary',    accentBorder);
-            set('--accent-secondary',  'rgb('+accentSecondary[0]+','+accentSecondary[1]+','+accentSecondary[2]+')');
-            set('--accent-highlight',  'rgb('+accentHighlight[0]+','+accentHighlight[1]+','+accentHighlight[2]+')');
-
-            set('--link-color',        'rgb('+textSecondary[0]+','+textSecondary[1]+','+textSecondary[2]+')');
-            set('--link-hover-color',  'rgb('+accentHighlight[0]+','+accentHighlight[1]+','+accentHighlight[2]+')');
-
-            set('--btn-bg',            'rgba('+accentRgb[0]+','+accentRgb[1]+','+accentRgb[2]+',0.22)');
-            set('--btn-color',         'rgb('+textPrimary[0]+','+textPrimary[1]+','+textPrimary[2]+')');
-
-            set('--progress-color',    'rgb('+progressRgb[0]+','+progressRgb[1]+','+progressRgb[2]+')');
-
-            set('--input-bg',          'rgba('+inputBgRgb[0]+','+inputBgRgb[1]+','+inputBgRgb[2]+',0.85)');
-            set('--input-color',       'rgb('+inputColor[0]+','+inputColor[1]+','+inputColor[2]+')');
-            set('--input-border',      accentBorder);
-
-            set('--svg-text-color',    'rgb('+svgTextRgb[0]+','+svgTextRgb[1]+','+svgTextRgb[2]+')');
-            set('--svg-grid-stroke',   'rgba('+accentRgb[0]+','+accentRgb[1]+','+accentRgb[2]+',0.15)');
-            set('--bwm-border',        'rgba('+accentRgb[0]+','+accentRgb[1]+','+accentRgb[2]+',0.18)');
-            set('--svg-bg',            'rgba('+headerRgb[0]+','+headerRgb[1]+','+headerRgb[2]+',0.30)');
-            set('--tab-active-bg',     'rgba('+accentRgb[0]+','+accentRgb[1]+','+accentRgb[2]+',0.20)');
-
-            set('--row-even',          rowEven);
-            set('--row-odd',           rowOdd);
-
-            set('--scrollbar-track',   'rgba('+accentRgb[0]+','+accentRgb[1]+','+accentRgb[2]+',0.05)');
-            set('--scrollbar-thumb',   scrollThumb);
-            set('--scrollbar-hover',   scrollHover);
-
-            // Update fallback bg di html juga
-            document.documentElement.style.backgroundColor =
-                'rgb('+bgFallbackRgb[0]+','+bgFallbackRgb[1]+','+bgFallbackRgb[2]+')';
-
-        } catch(e) {
-            // Canvas CORS gagal — CSS fallback dari default.css tetap aktif
-        }
+        try{
+            var cv=document.createElement('canvas');cv.width=96;cv.height=54;
+            var ctx=cv.getContext('2d');ctx.drawImage(vid,0,0,96,54);
+            var px=ctx.getImageData(0,0,96,54).data,r=0,g=0,b=0,n=0;
+            for(var i=0;i<px.length;i+=4){var pr=px[i],pg=px[i+1],pb=px[i+2],br=(pr+pg+pb)/3;if(br<15||br>240)continue;r+=pr;g+=pg;b+=pb;n++;}
+            if(n===0)return;
+            applyPalette(Math.round(r/n),Math.round(g/n),Math.round(b/n));
+        }catch(e){}
     });
+
+    // ── STATE ──────────────────────────────────────────────
+    var MUTE_KEY  = 'ft_bg_muted';
+    var PANEL_KEY = 'ft_panel_hidden';
+    var TRIGGER_RADIUS = 80;
+    var isMuted       = localStorage.getItem(MUTE_KEY)  === null ? true  : localStorage.getItem(MUTE_KEY)  === 'true';
+    var isPanelHidden = localStorage.getItem(PANEL_KEY) === null ? false : localStorage.getItem(PANEL_KEY) === 'true';
+
+    // ── STYLES ─────────────────────────────────────────────
+    var ctrlStyle = document.createElement('style');
+    ctrlStyle.textContent = [
+        '#ft-controls{position:fixed;bottom:16px;right:16px;z-index:9999;display:flex;gap:8px;opacity:0;transform:translateY(6px);transition:opacity 0.25s ease,transform 0.25s ease;pointer-events:none;}',
+        '#ft-controls.visible{opacity:1;transform:translateY(0);pointer-events:auto;}',
+        '#ft-controls button{width:34px;height:34px;border-radius:50%;border:none;background:rgba(15,15,15,0.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:background 0.2s,transform 0.15s;box-shadow:0 2px 8px rgba(0,0,0,0.4);}',
+        '#ft-controls button:hover{background:rgba(40,40,40,0.85);transform:scale(1.1);}',
+        '#ft-controls button svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}',
+        'body.ft-panel-hidden #container,body.ft-panel-hidden #navi,body.ft-panel-hidden #footer{opacity:0!important;pointer-events:none!important;transition:opacity 0.3s ease;}',
+        'body:not(.ft-panel-hidden) #container,body:not(.ft-panel-hidden) #navi,body:not(.ft-panel-hidden) #footer{opacity:1;transition:opacity 0.3s ease;}'
+    ].join('');
+    document.head.appendChild(ctrlStyle);
+
+    // ── SVG ICONS ──────────────────────────────────────────
+    var icons = {
+        muted:   '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>',
+        unmuted: '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>',
+        hide:    '<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>',
+        show:    '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
+    };
+
+    // ── CONTROLS ───────────────────────────────────────────
+    var controls = document.createElement('div');
+    controls.id = 'ft-controls';
+
+    var btnPanel = document.createElement('button');
+    function applyPanel(hidden){
+        isPanelHidden = hidden;
+        localStorage.setItem(PANEL_KEY, hidden ? 'true' : 'false');
+        btnPanel.innerHTML = hidden ? icons.show : icons.hide;
+        btnPanel.title     = hidden ? 'Show panels' : 'Hide panels';
+        hidden ? document.body.classList.add('ft-panel-hidden')
+               : document.body.classList.remove('ft-panel-hidden');
+    }
+    btnPanel.addEventListener('click', function(){ applyPanel(!isPanelHidden); });
+
+    var btnMute = document.createElement('button');
+    function applyMute(muted){
+        isMuted   = muted;
+        vid.muted = muted;
+        localStorage.setItem(MUTE_KEY, muted ? 'true' : 'false');
+        btnMute.innerHTML = muted ? icons.muted : icons.unmuted;
+        btnMute.title     = muted ? 'Unmute' : 'Mute';
+    }
+    btnMute.addEventListener('click', function(){ applyMute(!isMuted); });
+
+    controls.appendChild(btnPanel);
+    controls.appendChild(btnMute);
+
+    function attachControls(){
+        document.body.appendChild(controls);
+        vid.addEventListener('canplay', function(){ applyMute(isMuted); });
+        applyMute(isMuted);
+        applyPanel(isPanelHidden);
+        document.addEventListener('mousemove', function(e){
+            var rect = controls.getBoundingClientRect();
+            var cx = rect.left + rect.width/2;
+            var cy = rect.top  + rect.height/2;
+            var dist = Math.sqrt(Math.pow(e.clientX-cx,2)+Math.pow(e.clientY-cy,2));
+            dist < TRIGGER_RADIUS ? controls.classList.add('visible') : controls.classList.remove('visible');
+        });
+    }
+
+    if(document.body) attachControls();
+    else document.addEventListener('DOMContentLoaded', attachControls);
 
 })();
