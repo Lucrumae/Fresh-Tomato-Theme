@@ -69,6 +69,8 @@ To activate the sound, slide the cursor to the bottom right and the button to ac
 
 What if I'm using a mobile phone? Tap the bottom right corner of the screen on the web and the button will appear.
 
+>Still no sound? That means bgmp4.gif in the theme you selected has no sound.
+
 ---
 
 ## 🎬 How to Add a Custom MP4 Background
