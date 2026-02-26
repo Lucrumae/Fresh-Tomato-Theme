@@ -148,16 +148,6 @@ Tested on: **Cisco Linksys EA6300v1/EA6400** (ARMv7, FreshTomato 2026.1)
 
 ---
 
-## 👤 Credits
-
-| Role | Name |
-|------|------|
-| Firmware | [FreshTomato](https://freshtomato.org) |
-| Bocchi The Rock | © Aki Hamaji / Aniplex |
-| Wuthering Waves → Aemeath | © Kuro Games |
-
----
-
 <div align="center">
 
 Personal Project For My Fresh Tomato Linksys EA6300v1/EA6400
