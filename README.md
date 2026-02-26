@@ -38,8 +38,9 @@
 > *(Administration → JFFS → Enable)*
 > *Format & Load JFSS if Mount Failed
 
-Paste this single command into your router's SSH terminal:
 >Do not use the default terminal system on the Fresh Tomato website. Use the SSH terminal in PuTTY for Windows or Termius for Android.
+
+Paste this single command into your router's SSH terminal:
 
 ```sh
 wget -O - https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/install | sh
