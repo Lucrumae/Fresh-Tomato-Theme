@@ -38,6 +38,11 @@
 ![Bocchi The Rock Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/BocchiTheRock/preview.png)
 
 ---
+### 🦎 Adaptive Theme
+
+>Adaptive Theme is a theme that adjusts the panel colors according to the custom bgmp4.gif you have uploaded.
+
+---
 
 ## 🚀 Installation
 
