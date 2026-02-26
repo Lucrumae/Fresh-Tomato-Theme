@@ -62,6 +62,7 @@ After installation, press **Ctrl + F5** in your browser to clear the cache.
 Didn't work? Then try rebooting and make sure your browser cache has been cleared.
 
 ---
+
 ## 🔇 How do I turn on the mp4 background sound?
 
 To activate the sound, slide the cursor to the bottom right and the button to activate the sound will appear along with the hide panel button.
