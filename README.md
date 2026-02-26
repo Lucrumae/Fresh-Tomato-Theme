@@ -12,6 +12,12 @@
 
 ---
 
+### ⬜ Material White
+
+![Material White Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/MaterialWhiteTheme/preview.png)
+
+---
+
 ## ✨ Themes
 
 ### 🎸 Bocchi The Rock
