@@ -60,9 +60,11 @@ After installation, press **Ctrl + F5** in your browser to clear the cache.
 >If the theme hasn't changed, try going to "administration → admin access" and clicking save without changing anything.
 
 Didn't work? Then try rebooting and make sure your browser cache has been cleared.
----
 
-#To activate the sound, slide the cursor to the bottom right and the button to activate the sound will appear along with the hide panel button.
+---
+## 🔇 How do I turn on the mp4 background sound?
+
+To activate the sound, slide the cursor to the bottom right and the button to activate the sound will appear along with the hide panel button.
 
 ---
 
