@@ -57,7 +57,7 @@ The installer will:
 
 After installation, press **Ctrl + F5** in your browser to clear the cache.
 
->If the theme hasn't changed, try going to "administration → admin access" and clicking make surethe Theme UI is Default then save without changing anything.
+>If the theme hasn't changed, try going to "administration → admin access" and Ensure that the Theme UI is in Default Theme, then click Save without changing anything.
 
 Didn't work? Then try rebooting and make sure your browser cache has been cleared.
 
