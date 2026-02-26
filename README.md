@@ -21,9 +21,15 @@
 
 ---
 
+### ⬛ Material Black
+
+![Material Black Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/MaterialBlack/preview.png)
+
+---
+
 ### 🐈 Sleeping Cat
 
-![Aemeath Wuthering Waves Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/SleepingCat/preview.png)
+![Sleeping Cat Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/SleepingCat/preview.png)
 
 ---
 
