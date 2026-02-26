@@ -1,4 +1,5 @@
 Adaptive Theme|AdaptiveTheme
+Adaptive Realtime|AdaptiveRealtime
 Material White|MaterialWhite
 Material Black|MaterialBlack
 Sleeping Cat In Train|SleepingCat
