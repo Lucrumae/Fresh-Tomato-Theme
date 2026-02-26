@@ -36,7 +36,7 @@
 
 > **Requirements:** FreshTomato firmware with JFFS partition enabled
 > *(Administration → JFFS → Enable).*
-> *Format & Load JFSS if Mount Failed*
+> *Format & Load JFSS if Mount Failed.*
 
 >Do not use the default terminal system on the Fresh Tomato website. Use the SSH terminal in PuTTY for Windows or Termius for Android.
 
