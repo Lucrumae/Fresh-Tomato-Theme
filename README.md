@@ -39,7 +39,7 @@
 > *(Administration → JFFS → Enable).*
 > *Format & Load JFSS if Mount Failed.*
 
->Do not use the default terminal system on the Fresh Tomato website. Use the SSH terminal in PuTTY for Windows or Termius for Android.
+>Do not use the default terminal system on the Fresh Tomato 192.168.1.1 web. Use the SSH terminal in PuTTY for Windows or Termius for Android.
 
 Paste this single command into your router's SSH terminal:
 
