@@ -4,7 +4,7 @@
 # GLOBAL CONFIGURATION
 # =================================================================
 BASE_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main"
-THEME_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/master"
+THEME_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/master/Theme"
 LIST_FILE="ThemeList.txt"
 INSTALL_PATH="/jffs/mywww"
 TEMP_WORKSPACE="/tmp/theme_deploy"
