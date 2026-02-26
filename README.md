@@ -41,6 +41,7 @@
 ### 🦎 Adaptive Theme
 
 >Adaptive Theme is a theme that adjusts the panel colors according to the custom bgmp4.gif you have uploaded.
+>
 >Adaptive Realtime is a theme that adjusts the panel color according to the background of the video that being played in real time.
 
 ---
