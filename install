@@ -217,8 +217,8 @@ for FILE in $THEME_FILES; do
     if [ $? -ne 0 ] || [ ! -s "$INSTALL_PATH/$FILE" ]; then
         # File opsional (bg.gif, bgmp4.gif) tidak wajib ada
         case "$FILE" in
-            bg.gif|bgmp4.gif)
-                echo -e "${DIM}skipped${NC}"
+            logol.png|logor.png|bgmp4.gif)
+                echo -e "${DIM}skipped${NC} ${DIM}(not used by this theme)${NC}"
                 ;;
             *)
                 echo -e "${RED}failed${NC}"
