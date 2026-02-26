@@ -26,7 +26,7 @@
 
 ---
 
-### 🌊 Aemeath — Wuthering Waves
+### 👾 Aemeath → Wuthering Waves
 
 ![Aemeath Wuthering Waves Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/AemeathWutheringWavesTheme/preview.png)
 
