@@ -35,7 +35,8 @@
 ## 🚀 Installation
 
 > **Requirements:** FreshTomato firmware with JFFS partition enabled.
-> *(Administration → JFFS2 → Enable)*
+> *(Administration → JFFS → Enable)*
+> *Format & Load JFSS if Mount Failed
 
 Paste this single command into your router's SSH terminal:
 
