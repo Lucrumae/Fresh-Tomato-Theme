@@ -1,29 +1,24 @@
-/* FreshTomato Theme v2026.1-Final-v27
-   MP4 Video Background Support (via bgmp4.gif workaround)
-   >> Improved version: dark theme + typography matching Wuthering Waves background <<
+/* FreshTomato — Adaptive Theme
+   Background & warna panel otomatis menyesuaikan video bgmp4.gif
+   CSS variables diupdate oleh adaptive.js saat video play
 */
 
 :root {
-    /* --- KONFIGURASI UTAMA --- */
-    --logo-left: url('logol.png');
+    /* --- LOGO --- */
+    --logo-left:  url('logol.png');
     --logo-right: url('logor.png');
 
-    /* --- WARNA & TRANSPARANSI --- */
-    --text-primary: #e8e0d8;
-    --text-secondary: #a89f96;
-    --text-value: #f5f0eb;
-    --accent-red: #ff4d8d;
-    --accent-blue: #7ec8e3;
-    --panel-bg: rgba(10, 8, 12, 0.55);
-    --header-bg: rgba(10, 8, 12, 0.65);
-    --panel-edge: rgba(255, 255, 255, 0.15);
+    /* --- FALLBACK COLORS (sebelum adaptive.js sampling) --- */
+    --panel-bg:        rgba(10, 8, 12, 0.50);
+    --panel-edge:      rgba(255, 255, 255, 0.15);
+    --header-bg:       rgba(10, 8, 12, 0.70);
+    --text-primary:    #f0ece8;
+    --text-secondary:  rgba(240, 236, 232, 0.65);
+    --accent-auto:     #7ec8e3;
+    --accent-contrast: #ff4d8d;
 
-    /* --- AUTO COLOR (diisi bg-video.js saat video play) --- */
-    --accent-auto: #7ec8e3;       /* fallback sebelum video disampling */
-    --accent-contrast: #ff4d8d;   /* fallback kontras */
-
-    /* --- UKURAN LOGO --- */
-    --size-left: auto 25px;
+    /* --- LOGO SIZE --- */
+    --size-left:  auto 25px;
     --size-right: auto 45px;
 
     /* --- SPEED --- */
@@ -36,14 +31,7 @@
     to   { opacity: 1; }
 }
 
-/* Animasi hue-rotate khusus untuk baris CPU Usage saja */
-@keyframes cpuHuePulse {
-    0%   { filter: hue-rotate(0deg) brightness(1.3); }
-    50%  { filter: hue-rotate(160deg) brightness(1.5); }
-    100% { filter: hue-rotate(0deg) brightness(1.3); }
-}
-
-/* --- GLOBAL LAYOUT --- */
+/* --- GLOBAL --- */
 html {
     background-color: #0a080c !important;
 }
@@ -54,43 +42,25 @@ body {
     animation: fadeIn 0.5s ease-in;
 }
 
-/* --- VIDEO BACKGROUND --- */
-#bg-video {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    z-index: -1;
-    object-fit: cover;
-    object-position: center center;
-    pointer-events: none;
-}
-
-/* --- LAYOUT --- */
-#container {
-    max-width: 50% !important;
-    margin-left: 0 !important;
-    margin-right: auto !important;
-}
-
-#content {
-    max-width: 100% !important;
-    margin-left: 0 !important;
-}
-
 /* --- PANELS --- */
 #container, #content, .section, .fields, fieldset, .box, .content,
-.message, .tomato-grid, .bwmg, .data-table {
+.message, .tomato-grid, .bwmg, .data-table, table, tbody, thead,
+tr, td, th {
     background: var(--panel-bg) !important;
+    backdrop-filter: blur(6px) !important;
+    -webkit-backdrop-filter: blur(6px) !important;
     text-shadow: none !important;
-    border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
-/* --- HEADER & DUAL LOGO --- */
+#container, #content, .section, fieldset {
+    border: 1px solid var(--panel-edge) !important;
+    border-radius: 4px !important;
+}
+
+/* --- HEADER --- */
 #header {
     background-color: var(--header-bg) !important;
-    border-bottom: 2px solid var(--accent-red) !important;
+    border-bottom: 2px solid var(--accent-contrast) !important;
     height: 70px !important;
     background-image: var(--logo-left), var(--logo-right) !important;
     background-repeat: no-repeat, no-repeat !important;
@@ -103,88 +73,64 @@ body {
 /* --- SIDEBAR --- */
 #navi {
     background: var(--panel-bg) !important;
-    border-right: 2px solid var(--accent-red) !important;
+    border-right: 2px solid var(--accent-contrast) !important;
     padding-right: 10px !important;
 }
 
 #navi a {
-    color: var(--text-secondary) !important;
-    font-weight: 600 !important;
-    transition: transform var(--transition-speed) ease;
-    will-change: transform;
+    color: var(--text-primary) !important;
+    font-weight: 700 !important;
+    transition: transform var(--transition-speed) ease,
+                color var(--transition-speed) ease;
 }
 
 #navi a:hover {
     transform: translateX(5px);
-    color: var(--accent-blue) !important;
+    color: var(--accent-auto) !important;
 }
 
-#navi a.indent1 { color: var(--accent-red) !important; font-weight: bold !important; }
+#navi a.indent1 {
+    color: var(--accent-contrast) !important;
+    font-weight: bold !important;
+}
 
 /* --- TYPOGRAPHY --- */
-body, div, p, li, label {
+body, td, span, div, p, li, label, .message, .content {
     color: var(--text-primary) !important;
-    font-weight: 500 !important;
+    font-weight: 600 !important;
 }
 
 td:first-child, th {
     color: var(--text-secondary) !important;
-    font-weight: 600 !important;
+    font-weight: 700 !important;
 }
 
 td:not(:first-child) {
-    color: var(--accent-blue) !important;
-    font-weight: 500 !important;
+    color: var(--accent-auto) !important;
 }
 
 .section-title, legend, h1, h2, h3, h4 {
-    color: var(--accent-red) !important;
+    color: var(--accent-contrast) !important;
     font-weight: bold !important;
-    letter-spacing: 0.03em !important;
 }
 
-.message b, td b, span b {
-    color: var(--accent-blue) !important;
-}
-
-a {
-    color: var(--accent-blue) !important;
-}
-a:hover {
-    color: var(--accent-red) !important;
-}
-
-span, .version, small {
-    color: var(--text-secondary) !important;
-}
+a { color: var(--accent-auto) !important; }
+a:hover { color: var(--accent-contrast) !important; }
 
 /* --- TABLE ROWS --- */
-tr:nth-child(even) td {
-    background: rgba(255, 255, 255, 0.04) !important;
-}
-tr:nth-child(odd) td {
-    background: rgba(255, 255, 255, 0.01) !important;
-}
-
-/* --- PROGRESS BAR: warna biru, animasi hue-rotate di baris CPU Usage --- */
-div.progress-bar {
-    background-color: var(--accent-blue) !important;
-}
-
-/* Animasi hanya pada td.content yang berisi progress-wrapper
-   pakai :has() — didukung Chrome/Edge modern */
-td.content:has(div.progress-wrapper) {
-    animation: cpuHuePulse 3s ease-in-out infinite !important;
-}
+tr:nth-child(even) td { background: rgba(255,255,255,0.04) !important; }
+tr:nth-child(odd)  td { background: rgba(255,255,255,0.01) !important; }
+tr:nth-child(even)    { background: rgba(255,255,255,0.03) !important; }
+tr:nth-child(odd)     { background: rgba(0,0,0,0.10) !important; }
 
 /* --- BUTTONS --- */
 input[type="button"], input[type="submit"] {
-    background: var(--accent-red) !important;
+    background: var(--accent-contrast) !important;
     border: none !important;
     color: #ffffff !important;
-    font-weight: 600 !important;
-    transition: opacity var(--transition-speed) ease;
+    font-weight: 700 !important;
     border-radius: 4px !important;
+    transition: opacity var(--transition-speed) ease;
 }
 
 input[type="button"]:hover, input[type="submit"]:hover {
@@ -193,105 +139,41 @@ input[type="button"]:hover, input[type="submit"]:hover {
 
 /* --- INPUT FIELDS --- */
 input[type="text"], input[type="password"], select, textarea {
-    background: rgba(255, 255, 255, 0.08) !important;
-    color: var(--text-value) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    background: rgba(255,255,255,0.08) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--panel-edge) !important;
     border-radius: 3px !important;
 }
 
-/* --- FIX BACKGROUND PUTIH di halaman Logs & lainnya --- */
+option { background: #1a1a2e !important; }
+
+/* --- LOGS & PRE --- */
 pre, code, .log, #syslog, textarea {
-    background: rgba(10, 8, 12, 0.75) !important;
-    color: var(--accent-blue) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    background: rgba(0,0,0,0.55) !important;
+    color: var(--accent-auto) !important;
+    border: 1px solid var(--panel-edge) !important;
 }
 
-div, td, th, tr, table, tbody, thead,
-.fields, .section, fieldset, legend,
-.tomato-grid, .data-table {
-    background-color: transparent !important;
-}
+/* --- SCROLLBAR --- */
+::-webkit-scrollbar { width: 8px; background: rgba(0,0,0,0.3); }
+::-webkit-scrollbar-thumb { background: var(--accent-contrast); border-radius: 4px; opacity: 0.5; }
+::-webkit-scrollbar-thumb:hover { opacity: 1; }
 
-table {
-    background: rgba(10, 8, 12, 0.55) !important;
-}
+/* --- SVG / GRAFIK --- */
+svg { background: transparent !important; }
+.svg-rect { fill: rgba(0,0,0,0.6) !important; }
+svg text, svg tspan { fill: var(--accent-contrast) !important; font-weight: 600 !important; }
+svg line, svg path.grid { stroke: rgba(255,255,255,0.12) !important; }
 
-tr:nth-child(even) {
-    background: rgba(255, 255, 255, 0.04) !important;
-}
-
-tr:nth-child(odd) {
-    background: rgba(10, 8, 12, 0.3) !important;
-}
-
-input[type="text"], input[type="checkbox"],
-select, option {
-    background: rgba(10, 8, 12, 0.75) !important;
-    color: var(--text-primary) !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
-}
-
-option {
-    background: #1a1a2e !important;
-}
-
-/* Scrollbar gelap */
-::-webkit-scrollbar {
-    width: 8px;
-    background: rgba(10, 8, 12, 0.5);
-}
-::-webkit-scrollbar-thumb {
-    background: rgba(255, 77, 141, 0.4);
-    border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 77, 141, 0.7);
-}
-
-/* --- FIX BACKGROUND PUTIH di halaman Bandwidth --- */
-#bwm-graph, .bwm-graph, #chart, .chart,
-canvas, svg {
-    background: rgba(10, 8, 12, 0.75) !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-}
-
-.tab, .tabs, ul.tabs, ul.tabs li,
-.ui-tabs, .ui-tabs-nav, .ui-tabs-nav li,
-.ui-widget, .ui-widget-content, .ui-widget-header {
-    background: rgba(10, 8, 12, 0.65) !important;
-    border-color: rgba(255, 255, 255, 0.1) !important;
+/* --- BANDWIDTH TABS --- */
+.tab, .tabs, ul.tabs li,
+.ui-tabs-nav li, .ui-widget-content, .ui-widget-header {
+    background: var(--panel-bg) !important;
+    border-color: var(--panel-edge) !important;
     color: var(--text-primary) !important;
 }
 
 .ui-tabs-nav li.ui-tabs-active,
 .ui-tabs-nav li:hover {
-    background: rgba(255, 77, 141, 0.3) !important;
-}
-
-body > div, #content > div, #container > div {
-    background-color: transparent !important;
-}
-
-.bwm-stats, .bwm-footer, .tstats {
-    background: rgba(10, 8, 12, 0.65) !important;
-    color: var(--text-primary) !important;
-}
-
-/* --- FIX SVG BACKGROUND PUTIH di Bandwidth --- */
-.svg-rect {
-    fill: rgba(10, 8, 12, 0.85) !important;
-}
-
-svg {
-    background: transparent !important;
-}
-
-/* --- FIX TEKS SVG di grafik Bandwidth --- */
-svg text, svg tspan {
-    fill: #ff4d8d !important;
-    font-weight: 600 !important;
-}
-
-svg line, svg path.grid {
-    stroke: rgba(255, 255, 255, 0.15) !important;
+    background: rgba(255,255,255,0.1) !important;
 }
