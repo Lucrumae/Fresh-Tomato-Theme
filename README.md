@@ -17,19 +17,19 @@
 
 ### ⬜ Material White
 
-![Material White Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/MaterialWhiteTheme/preview.png)
+![Material White Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/MaterialWhite/preview.png)
+
+---
+
+### 🐈 Sleeping Cat
+
+![Aemeath Wuthering Waves Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/AemeathWutheringWaves/preview.png)
 
 ---
 
 ### 🎸 Bocchi The Rock
 
-![Bocchi The Rock Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/BocchiTheRockTheme/preview.png)
-
----
-
-### 👾 Aemeath → Wuthering Waves
-
-![Aemeath Wuthering Waves Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/AemeathWutheringWavesTheme/preview.png)
+![Bocchi The Rock Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/BocchiTheRock/preview.png)
 
 ---
 
