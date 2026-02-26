@@ -1,5 +1,5 @@
 Material White|MaterialWhite
 Material Black|MaterialBlack
-Sleepy Cat In Train|SleepingCat
+Sleeping Cat In Train|SleepingCat
 Bocchi The Rock|BocchiTheRock
 Aemeath Wuthering Waves|AemeathWutheringWaves
