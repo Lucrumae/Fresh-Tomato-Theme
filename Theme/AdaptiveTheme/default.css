@@ -1,66 +1,100 @@
-/* FreshTomato — Adaptive Theme
-   Background & warna panel otomatis menyesuaikan video bgmp4.gif
-   CSS variables diupdate oleh adaptive.js saat video play
-*/
+/* =================================================================
+   Adaptive Theme — FreshTomato
+   Semua warna di-generate otomatis oleh adaptive.js
+   Variable di bawah adalah FALLBACK sebelum video disampling
+   ================================================================= */
 
 :root {
-    /* --- LOGO --- */
+
     --logo-left:  url('logol.png');
     --logo-right: url('logor.png');
-
-    /* --- FALLBACK COLORS (sebelum adaptive.js sampling) --- */
-    --panel-bg:        rgba(10, 8, 12, 0.50);
-    --panel-edge:      rgba(255, 255, 255, 0.15);
-    --header-bg:       rgba(10, 8, 12, 0.70);
-    --text-primary:    #f0ece8;
-    --text-secondary:  rgba(240, 236, 232, 0.65);
-    --accent-auto:     #7ec8e3;
-    --accent-contrast: #ff4d8d;
-
-    /* --- LOGO SIZE --- */
     --size-left:  auto 25px;
     --size-right: auto 45px;
 
-    /* --- SPEED --- */
-    --transition-speed: 0.2s;
+    /* --- FALLBACK BACKGROUNDS --- */
+    --bg-fallback: #0a080c;
+    --panel-bg:    rgba(10, 8, 12, 0.28);
+    --header-bg:   rgba(10, 8, 12, 0.60);
+    --log-bg:      rgba(255, 248, 230, 0.94);
+    --bwm-bg:      rgba(126, 200, 227, 0.07);
+    --tab-bg:      rgba(10, 8, 12, 0.35);
+
+    /* --- FALLBACK TEXT --- */
+    --text-primary:   #f0ece8;
+    --text-secondary: #7ec8e3;
+    --text-value:     #ffe6c4;
+    --log-color:      #1a0a00;
+    --tab-text:       #f0ece8;
+
+    /* --- FALLBACK ACCENTS --- */
+    --accent-primary:   rgba(126, 200, 227, 0.22);
+    --accent-secondary: #7ec8e3;
+    --accent-highlight: #b8e8f5;
+
+    /* --- FALLBACK LINKS --- */
+    --link-color:       #7ec8e3;
+    --link-hover-color: #b8e8f5;
+
+    /* --- FALLBACK BUTTONS --- */
+    --btn-bg:    rgba(126, 200, 227, 0.18);
+    --btn-color: #f0ece8;
+
+    /* --- FALLBACK PROGRESS --- */
+    --progress-color: #7ec8e3;
+
+    /* --- FALLBACK INPUTS --- */
+    --input-bg:     rgba(240, 236, 232, 0.85);
+    --input-color:  #0a080c;
+    --input-border: rgba(126, 200, 227, 0.25);
+
+    /* --- FALLBACK SVG --- */
+    --svg-text-color:  #f0ece8;
+    --svg-grid-stroke: rgba(126, 200, 227, 0.15);
+    --bwm-border:      rgba(126, 200, 227, 0.18);
+    --svg-bg:          rgba(10, 8, 12, 0.32);
+    --tab-active-bg:   rgba(126, 200, 227, 0.18);
+
+    /* --- FALLBACK ROWS --- */
+    --row-even: rgba(126, 200, 227, 0.06);
+    --row-odd:  rgba(126, 200, 227, 0.02);
+
+    /* --- FALLBACK SCROLLBAR --- */
+    --scrollbar-track: rgba(126, 200, 227, 0.05);
+    --scrollbar-thumb: rgba(126, 200, 227, 0.35);
+    --scrollbar-hover: rgba(126, 200, 227, 0.55);
+
+    --transition-speed: 0.22s;
 }
 
-/* --- KEYFRAMES --- */
+/* ================================================================= */
+
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
+    from { opacity: 0; transform: translateY(3px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
-/* --- GLOBAL --- */
-html {
-    background-color: #0a080c !important;
+@keyframes cpuPulse {
+    0%   { filter: hue-rotate(0deg)   brightness(1.1) saturate(1.2); }
+    50%  { filter: hue-rotate(20deg)  brightness(1.3) saturate(1.5); }
+    100% { filter: hue-rotate(0deg)   brightness(1.1) saturate(1.2); }
 }
 
-body {
-    background-color: transparent !important;
-    background-image: none !important;
-    animation: fadeIn 0.5s ease-in;
-}
+html { background-color: var(--bg-fallback) !important; }
+body { background: none !important; animation: fadeIn 0.6s ease-out; }
 
-/* --- PANELS --- */
+/* #bg-video diinject langsung oleh adaptive.js */
+
 #container, #content, .section, .fields, fieldset, .box, .content,
-.message, .tomato-grid, .bwmg, .data-table, table, tbody, thead,
-tr, td, th {
+.message, .tomato-grid, .bwmg, .data-table, table, tbody, thead, tr, td, th {
     background: var(--panel-bg) !important;
-    backdrop-filter: blur(6px) !important;
-    -webkit-backdrop-filter: blur(6px) !important;
     text-shadow: none !important;
+    border-color: var(--accent-primary) !important;
 }
 
-#container, #content, .section, fieldset {
-    border: 1px solid var(--panel-edge) !important;
-    border-radius: 4px !important;
-}
-
-/* --- HEADER --- */
 #header {
     background-color: var(--header-bg) !important;
-    border-bottom: 2px solid var(--accent-contrast) !important;
+    border-bottom: 2px solid var(--accent-primary) !important;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.35) !important;
     height: 70px !important;
     background-image: var(--logo-left), var(--logo-right) !important;
     background-repeat: no-repeat, no-repeat !important;
@@ -70,110 +104,128 @@ tr, td, th {
 
 #header .title, #header .version { display: none !important; }
 
-/* --- SIDEBAR --- */
+a, a:link, a:visited { color: var(--link-color) !important; }
+a:hover              { color: var(--link-hover-color) !important; }
+
 #navi {
     background: var(--panel-bg) !important;
-    border-right: 2px solid var(--accent-contrast) !important;
+    border-right: 2px solid var(--accent-primary) !important;
     padding-right: 10px !important;
 }
 
 #navi a {
-    color: var(--text-primary) !important;
+    color: var(--text-secondary) !important;
     font-weight: 700 !important;
     transition: transform var(--transition-speed) ease,
                 color var(--transition-speed) ease;
 }
 
-#navi a:hover {
-    transform: translateX(5px);
-    color: var(--accent-auto) !important;
-}
+#navi a:hover   { transform: translateX(5px); color: var(--accent-highlight) !important; }
+#navi a.indent1 { color: var(--accent-secondary) !important; font-weight: bold !important; }
 
-#navi a.indent1 {
-    color: var(--accent-contrast) !important;
-    font-weight: bold !important;
-}
-
-/* --- TYPOGRAPHY --- */
-body, td, span, div, p, li, label, .message, .content {
+body, div, p, li, label, .message, .content {
     color: var(--text-primary) !important;
     font-weight: 600 !important;
 }
 
-td:first-child, th {
-    color: var(--text-secondary) !important;
-    font-weight: 700 !important;
-}
+td:first-child, th   { color: var(--text-secondary) !important; font-weight: 700 !important; }
+td:not(:first-child) { color: var(--text-value) !important; }
 
-td:not(:first-child) {
-    color: var(--accent-auto) !important;
-}
-
-.section-title, legend, h1, h2, h3, h4 {
-    color: var(--accent-contrast) !important;
+.section-title, legend, .message b, h1, h2, h3, h4 {
+    color: var(--accent-secondary) !important;
     font-weight: bold !important;
+    letter-spacing: 0.02em !important;
 }
 
-a { color: var(--accent-auto) !important; }
-a:hover { color: var(--accent-contrast) !important; }
+tr:nth-child(even) td { background: var(--row-even) !important; }
+tr:nth-child(odd)  td { background: var(--row-odd)  !important; }
+tr:nth-child(even)    { background: var(--row-even) !important; }
+tr:nth-child(odd)     { background: var(--row-odd)  !important; }
 
-/* --- TABLE ROWS --- */
-tr:nth-child(even) td { background: rgba(255,255,255,0.04) !important; }
-tr:nth-child(odd)  td { background: rgba(255,255,255,0.01) !important; }
-tr:nth-child(even)    { background: rgba(255,255,255,0.03) !important; }
-tr:nth-child(odd)     { background: rgba(0,0,0,0.10) !important; }
-
-/* --- BUTTONS --- */
 input[type="button"], input[type="submit"] {
-    background: var(--accent-contrast) !important;
+    background: var(--btn-bg) !important;
     border: none !important;
-    color: #ffffff !important;
-    font-weight: 700 !important;
+    color: var(--btn-color) !important;
+    font-weight: 600 !important;
     border-radius: 4px !important;
-    transition: opacity var(--transition-speed) ease;
+    transition: opacity var(--transition-speed) ease,
+                transform var(--transition-speed) ease;
 }
-
 input[type="button"]:hover, input[type="submit"]:hover {
-    opacity: 0.8;
+    opacity: 0.85;
+    transform: translateY(-1px);
 }
 
-/* --- INPUT FIELDS --- */
-input[type="text"], input[type="password"], select, textarea {
-    background: rgba(255,255,255,0.08) !important;
-    color: var(--text-primary) !important;
-    border: 1px solid var(--panel-edge) !important;
+input[type="text"], input[type="password"], input[type="checkbox"],
+select, textarea {
+    background: var(--input-bg) !important;
+    color: var(--input-color) !important;
+    border: 1px solid var(--input-border) !important;
     border-radius: 3px !important;
 }
+option { background: var(--input-bg) !important; color: var(--input-color) !important; }
 
-option { background: #1a1a2e !important; }
-
-/* --- LOGS & PRE --- */
-pre, code, .log, #syslog, textarea {
-    background: rgba(0,0,0,0.55) !important;
-    color: var(--accent-auto) !important;
-    border: 1px solid var(--panel-edge) !important;
+div.progress-bar { background-color: var(--progress-color) !important; }
+td.content:has(div.progress-wrapper) {
+    animation: cpuPulse 3s ease-in-out infinite !important;
 }
 
-/* --- SCROLLBAR --- */
-::-webkit-scrollbar { width: 8px; background: rgba(0,0,0,0.3); }
-::-webkit-scrollbar-thumb { background: var(--accent-contrast); border-radius: 4px; opacity: 0.5; }
-::-webkit-scrollbar-thumb:hover { opacity: 1; }
+pre, code, .log, #syslog, textarea {
+    background: var(--log-bg) !important;
+    color: var(--log-color) !important;
+    border: 1px solid var(--bwm-border) !important;
+}
 
-/* --- SVG / GRAFIK --- */
-svg { background: transparent !important; }
-.svg-rect { fill: rgba(0,0,0,0.6) !important; }
-svg text, svg tspan { fill: var(--accent-contrast) !important; font-weight: 600 !important; }
-svg line, svg path.grid { stroke: rgba(255,255,255,0.12) !important; }
+#bwm-graph, .bwm-graph, #chart, .chart, canvas, svg {
+    background: var(--bwm-bg) !important;
+    border: 1px solid var(--bwm-border) !important;
+}
 
-/* --- BANDWIDTH TABS --- */
-.tab, .tabs, ul.tabs li,
-.ui-tabs-nav li, .ui-widget-content, .ui-widget-header {
-    background: var(--panel-bg) !important;
-    border-color: var(--panel-edge) !important;
-    color: var(--text-primary) !important;
+.tab, .tabs, ul.tabs, ul.tabs li,
+.ui-tabs, .ui-tabs-nav, .ui-tabs-nav li,
+.ui-widget, .ui-widget-content, .ui-widget-header {
+    background: var(--tab-bg) !important;
+    border-color: var(--bwm-border) !important;
+    color: var(--tab-text) !important;
 }
 
 .ui-tabs-nav li.ui-tabs-active,
-.ui-tabs-nav li:hover {
-    background: rgba(255,255,255,0.1) !important;
+.ui-tabs-nav li:hover { background: var(--tab-active-bg) !important; }
+
+.bwm-stats, .bwm-footer, .tstats {
+    background: var(--tab-bg) !important;
+    color: var(--tab-text) !important;
 }
+
+.svg-rect { fill: var(--svg-bg) !important; }
+svg { background: transparent !important; }
+svg text, svg tspan { fill: var(--svg-text-color) !important; font-weight: 600 !important; }
+svg line, svg path.grid { stroke: var(--svg-grid-stroke) !important; }
+
+#bwm-daily, #bwm-weekly, #bwm-monthly,
+#bwm-daily table, #bwm-weekly table, #bwm-monthly table,
+#bwm-daily td, #bwm-weekly td, #bwm-monthly td,
+#bwm-daily tr, #bwm-weekly tr, #bwm-monthly tr,
+.bwm-table, .bwm-table td, .bwm-table tr,
+#content table, #content td, #content tr {
+    background: var(--panel-bg) !important;
+    color: var(--text-primary) !important;
+}
+
+#bwm-graph-container, #bwm-graph div,
+#graph, #graph div, .graph-container,
+#chart-container, #chartDiv,
+div[id^="bwm"], div[class^="bwm"] {
+    background: var(--bwm-bg) !important;
+}
+
+div, td, th, tr, table, tbody, thead,
+.fields, .section, fieldset, legend,
+.tomato-grid, .data-table,
+body > div, #content > div, #container > div {
+    background-color: transparent !important;
+}
+
+::-webkit-scrollbar       { width: 8px; background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
