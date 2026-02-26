@@ -1,3 +1,4 @@
-Material White|MaterialWhiteTheme
-Bocchi The Rock|BocchiTheRockTheme
-Aemeath Wuthering Waves|AemeathWutheringWavesTheme
+Material White|/Theme/MaterialWhite
+Sleepy Cat In Train|/Theme/SleepyCat
+Bocchi The Rock|/Theme/BocchiTheRock
+Aemeath Wuthering Waves|/Theme/AemeathWutheringWaves
