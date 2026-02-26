@@ -4,7 +4,6 @@
 # GLOBAL CONFIGURATION
 # =================================================================
 BASE_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main"
-THEME_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/Theme"
 LIST_FILE="ThemeList.txt"
 INSTALL_PATH="/jffs/mywww"
 TEMP_WORKSPACE="/tmp/theme_deploy"
@@ -194,7 +193,7 @@ echo -e "${BGREEN}done${NC}"
 # =================================================================
 # PHASE 4: DOWNLOAD THEME FILES LANGSUNG (TANPA TAR)
 # =================================================================
-THEME_BASE_URL="$THEME_URL/$SELECTED_FOLDER"
+THEME_BASE_URL="$BASE_URL/$SELECTED_FOLDER"
 failed_files=""
 
 echo -e "  ${CYAN}[3/5]${NC}  Downloading theme files..."
