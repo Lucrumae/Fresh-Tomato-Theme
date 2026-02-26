@@ -12,7 +12,8 @@
 
 ---
 
-## ✨ Themes Preview
+## ✨ Themes Preview 
+>*Just ignore the CPU temperature. My device does have a problem with the cooling system.*
 
 ### ⬜ Material White
 
