@@ -1,12 +1,15 @@
-/* adaptive.js — FreshTomato Adaptive Theme Engine
-   - Sample warna sekali saat video play
+/* adaptiverealtime.js — FreshTomato True Realtime Adaptive Theme
+   - requestAnimationFrame + throttle 100ms
    - Mengutamakan warna cerah & kontras (WCAG)
    - Controls muncul saat kursor dekat pojok kanan bawah
 */
 (function () {
 
     var vidStyle = document.createElement('style');
-    vidStyle.textContent = '#bg-video{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:-1;object-fit:cover;object-position:center center;pointer-events:none;}';
+    vidStyle.textContent =
+        '#bg-video{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:-1;object-fit:cover;object-position:center center;pointer-events:none;}' +
+        '*{transition:background-color 0.8s ease,border-color 0.8s ease,color 0.8s ease!important;}' +
+        'a,input,select,textarea,button{transition-duration:0.15s!important;}';
     document.head.appendChild(vidStyle);
 
     var vid = document.createElement('video');
@@ -29,48 +32,43 @@
     function set(k,v){document.documentElement.style.setProperty(k,v);}
     function applyPalette(r,g,b){var hsl=rgbToHsl(r,g,b),hue=hsl[0],sat=hsl[1],lum=hsl[2];var isDark=lum<50;var sat2=Math.max(sat,50);var pL=isDark?Math.min(lum+10,25):Math.max(lum-10,75);var hL=isDark?Math.min(lum+5,18):Math.max(lum-5,82);var panelRgb=hslToRgb(hue,Math.min(sat2,45),pL);var headerRgb=hslToRgb(hue,Math.min(sat2,50),hL);var accentRgb=hslToRgb(hue,Math.max(sat2,60),isDark?70:40);var accent2=hslToRgb((hue+30)%360,Math.max(sat2,55),isDark?75:35);var accentHl=hslToRgb(hue,Math.max(sat2,50),isDark?88:25);var bgFb=hslToRgb(hue,Math.min(sat,35),isDark?8:92);var eBgR=Math.round(panelRgb[0]*0.28+bgFb[0]*0.72);var eBgG=Math.round(panelRgb[1]*0.28+bgFb[1]*0.72);var eBgB=Math.round(panelRgb[2]*0.28+bgFb[2]*0.72);var tP=ensureContrast(isDark?250:15,isDark?245:10,isDark?235:8,eBgR,eBgG,eBgB,5.0);var tS=ensureContrast(accentRgb[0],accentRgb[1],accentRgb[2],eBgR,eBgG,eBgB,4.5);var tV=ensureContrast(accent2[0],accent2[1],accent2[2],eBgR,eBgG,eBgB,4.5);var aSec=ensureContrast(accent2[0],accent2[1],accent2[2],eBgR,eBgG,eBgB,4.5);var aHl=ensureContrast(accentHl[0],accentHl[1],accentHl[2],eBgR,eBgG,eBgB,3.5);var logB=isDark?[255,250,235]:[10,6,3];var logC=bestText(logB[0],logB[1],logB[2]);var inpB=hslToRgb(hue,Math.min(sat*0.25,12),isDark?94:10);var inpC=bestText(inpB[0],inpB[1],inpB[2]);var prog=hslToRgb((hue+15)%360,Math.max(sat2,65),isDark?72:38);var svgT=ensureContrast(accentRgb[0],accentRgb[1],accentRgb[2],eBgR,eBgG,eBgB,4.5);set('--bg-fallback',rgb(bgFb));set('--panel-bg',rgba(panelRgb,0.28));set('--header-bg',rgba(headerRgb,0.60));set('--log-bg',rgb(logB));set('--bwm-bg',rgba(panelRgb,0.07));set('--tab-bg',rgba(headerRgb,0.35));set('--text-primary',rgb(tP));set('--text-secondary',rgb(tS));set('--text-value',rgb(tV));set('--log-color',rgb(logC));set('--tab-text',rgb(tP));set('--accent-primary',rgba(accentRgb,0.22));set('--accent-secondary',rgb(aSec));set('--accent-highlight',rgb(aHl));set('--link-color',rgb(tS));set('--link-hover-color',rgb(aHl));set('--btn-bg',rgba(accentRgb,0.22));set('--btn-color',rgb(tP));set('--progress-color',rgb(prog));set('--input-bg',rgba(inpB,0.85));set('--input-color',rgb(inpC));set('--input-border',rgba(accentRgb,0.25));set('--svg-text-color',rgb(svgT));set('--svg-grid-stroke',rgba(accentRgb,0.15));set('--bwm-border',rgba(accentRgb,0.18));set('--svg-bg',rgba(headerRgb,0.30));set('--tab-active-bg',rgba(accentRgb,0.20));set('--row-even',rgba(accentRgb,0.06));set('--row-odd',rgba(accentRgb,0.02));set('--scrollbar-track',rgba(accentRgb,0.05));set('--scrollbar-thumb',rgba(accentRgb,0.40));set('--scrollbar-hover',rgba(accentRgb,0.65));document.documentElement.style.backgroundColor=rgb(bgFb);}
 
-    // Simpan hasil sampling terakhir di sessionStorage agar tidak flicker saat page refresh
-    var CACHE_KEY = 'ft_palette';
-    function sampleFrame(){
-        try{
-            var cv=document.createElement('canvas');cv.width=96;cv.height=54;
-            var ctx=cv.getContext('2d');ctx.drawImage(vid,0,0,96,54);
-            var px=ctx.getImageData(0,0,96,54).data,r=0,g=0,b=0,n=0;
-            for(var i=0;i<px.length;i+=4){var pr=px[i],pg=px[i+1],pb=px[i+2],br=(pr+pg+pb)/3;if(br<15||br>240)continue;r+=pr;g+=pg;b+=pb;n++;}
-            if(n===0)return false;
-            var dr=Math.round(r/n),dg=Math.round(g/n),db=Math.round(b/n);
-            applyPalette(dr,dg,db);
-            try{sessionStorage.setItem(CACHE_KEY,dr+','+dg+','+db);}catch(e){}
-            return true;
-        }catch(e){return false;}
-    }
-
-    // Langsung pakai cache dari page sebelumnya agar tidak flicker
+    // Cache palette di sessionStorage agar tidak flicker saat refresh
+    var CACHE_KEY='ft_palette_rt';
     try{
         var cached=sessionStorage.getItem(CACHE_KEY);
         if(cached){var c=cached.split(',');applyPalette(parseInt(c[0]),parseInt(c[1]),parseInt(c[2]));}
     }catch(e){}
 
-    // Sample segera saat frame pertama tersedia, retry jika gagal
-    var sampled=false;
-    function trySample(){
-        if(sampled)return;
-        if(vid.readyState>=2){
-            if(sampleFrame())sampled=true;
-        }
+    var canvas=document.createElement('canvas');canvas.width=64;canvas.height=36;
+    var ctx=canvas.getContext('2d');
+    var lastHue=-1,lastSample=0,THROTTLE=100,HUE_THRESHOLD=5;
+
+    function sample(){
+        if(vid.readyState<2)return;
+        try{
+            ctx.drawImage(vid,0,0,64,36);
+            var px=ctx.getImageData(0,0,64,36).data,r=0,g=0,b=0,n=0;
+            for(var i=0;i<px.length;i+=4){var pr=px[i],pg=px[i+1],pb=px[i+2],br=(pr+pg+pb)/3;if(br<15||br>240)continue;r+=pr;g+=pg;b+=pb;n++;}
+            if(n===0)return;
+            r=Math.round(r/n);g=Math.round(g/n);b=Math.round(b/n);
+            var hsl=rgbToHsl(r,g,b),hue=hsl[0];
+            if(lastHue>=0){var diff=Math.abs(hue-lastHue);if(diff>180)diff=360-diff;if(diff<HUE_THRESHOLD)return;}
+            lastHue=hue;
+            applyPalette(r,g,b);
+            try{sessionStorage.setItem(CACHE_KEY,r+','+g+','+b);}catch(e){}
+        }catch(e){}
     }
 
-    vid.addEventListener('loadeddata', trySample);
-    vid.addEventListener('canplay',    trySample);
-    vid.addEventListener('playing',    trySample);
+    function loop(ts){if(ts-lastSample>=THROTTLE){lastSample=ts;sample();}requestAnimationFrame(loop);}
 
-    // Fallback retry setiap 200ms selama 3 detik jika semua event belum berhasil
-    var retryCount=0;
-    var retryTimer=setInterval(function(){
-        if(sampled||retryCount>15){clearInterval(retryTimer);return;}
-        trySample();
-        retryCount++;
-    },200);
+    // Mulai loop segera saat frame tersedia, jangan tunggu playing
+    function startLoop(){requestAnimationFrame(loop);}
+    if(vid.readyState>=2){startLoop();}
+    else{
+        vid.addEventListener('loadeddata', startLoop);
+        vid.addEventListener('canplay',    startLoop);
+        vid.addEventListener('playing',    startLoop);
+    }
 
     // ── STATE ──────────────────────────────────────────────
     var MUTE_KEY  = 'ft_bg_muted';
