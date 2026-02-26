@@ -59,6 +59,8 @@ After installation, press **Ctrl + F5** in your browser to clear the cache.
 
 >If the theme hasn't changed, try going to "administration → admin access" and clicking save without changing anything.
 ---
+Didn't work? Then try rebooting and make sure your browser cache has been cleared.
+---
 
 ## 🎬 How to Add a Custom MP4 Background
 
