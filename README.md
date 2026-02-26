@@ -2,7 +2,7 @@
 
 # 🍅 FreshTomato Theme Collection
 
-**A collection of custom UI themes for FreshTomato firmware.**
+**A collection of custom UI themes for FreshTomato firmware**
 
 ![GitHub repo size](https://img.shields.io/github/repo-size/Lucrumae/Fresh-Tomato-Theme?style=flat-square&color=ff4d8d)
 ![GitHub stars](https://img.shields.io/github/stars/Lucrumae/Fresh-Tomato-Theme?style=flat-square&color=7ec8e3)
