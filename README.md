@@ -67,6 +67,8 @@ Didn't work? Then try rebooting and make sure your browser cache has been cleare
 
 To activate the sound, slide the cursor to the bottom right and the button to activate the sound will appear along with the hide panel button.
 
+What if I'm using a mobile phone? Tap the bottom right corner of the screen on the web and the button will appear.
+
 ---
 
 ## 🎬 How to Add a Custom MP4 Background
