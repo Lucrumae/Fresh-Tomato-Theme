@@ -12,7 +12,7 @@
 
 ---
 
-## ✨ Themes
+## ✨ Themes Preview
 
 ### ⬜ Material White
 
