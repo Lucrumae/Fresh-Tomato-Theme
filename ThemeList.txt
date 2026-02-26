@@ -1,2 +1,3 @@
+Material White|MaterialWhiteTheme
 Bocchi The Rock|BocchiTheRockTheme
 Aemeath Wuthering Waves|AemeathWutheringWavesTheme
