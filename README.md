@@ -23,7 +23,7 @@
 
 ### 🐈 Sleeping Cat
 
-![Aemeath Wuthering Waves Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/AemeathWutheringWaves/preview.png)
+![Aemeath Wuthering Waves Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/SleepingCat/preview.png)
 
 ---
 
