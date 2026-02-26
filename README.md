@@ -64,7 +64,7 @@ FreshTomato's built-in web server (BusyBox httpd) does not support serving `.mp4
 ### Step 1 — Prepare your video file
 
 Compress and rename your video before uploading to the router. Recommended specs:
-- **Format:** MP4 (H.264)
+- **Format:** MP4
 - **Resolution:** 1920x1080 or lower
 - **File size:** under 15MB for smooth loading
 - **Filename:** `bgmp4.gif` *(must use this name)*
