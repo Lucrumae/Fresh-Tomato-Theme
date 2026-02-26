@@ -200,23 +200,40 @@ failed_files=""
 echo -e "  ${CYAN}[3/5]${NC}  Downloading theme files..."
 echo ""
 
-# Download bg-video.js dari root repo (shared semua tema)
-printf "        ${DIM}%-20s${NC} " "bg-video.js"
-do_wget "$BASE_URL/bg-video.js" "$INSTALL_PATH/bg-video.js"
-if [ $? -ne 0 ] || [ ! -s "$INSTALL_PATH/bg-video.js" ]; then
-    echo -e "${RED}failed${NC}"
-    fail "Could not download bg-video.js from main branch."
-    echo ""
-    exit 1
-fi
-SIZE=$(ls -lh "$INSTALL_PATH/bg-video.js" | awk '{print $5}')
-echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+# ---------------------------------------------------------------
+# Coba download adaptive.js dari main/Theme terlebih dahulu
+# Jika ada → pakai adaptive.js, jika tidak → fallback ke bg-video.js
+# ---------------------------------------------------------------
+VIDEO_SCRIPT="bg-video.js"
+printf "        ${DIM}%-20s${NC} " "adaptive.js"
+do_wget "$BASE_URL/Theme/adaptive.js" "$INSTALL_PATH/adaptive.js"
+if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/adaptive.js" ]; then
+    SIZE=$(ls -lh "$INSTALL_PATH/adaptive.js" | awk '{print $5}')
+    echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+    VIDEO_SCRIPT="adaptive.js"
+    ok "adaptive.js detected — using adaptive mode"
+else
+    rm -f "$INSTALL_PATH/adaptive.js" 2>/dev/null
+    echo -e "${DIM}not found, falling back to bg-video.js${NC}"
 
+    # Download bg-video.js sebagai fallback
+    printf "        ${DIM}%-20s${NC} " "bg-video.js"
+    do_wget "$BASE_URL/bg-video.js" "$INSTALL_PATH/bg-video.js"
+    if [ $? -ne 0 ] || [ ! -s "$INSTALL_PATH/bg-video.js" ]; then
+        echo -e "${RED}failed${NC}"
+        fail "Could not download bg-video.js from main branch."
+        echo ""
+        exit 1
+    fi
+    SIZE=$(ls -lh "$INSTALL_PATH/bg-video.js" | awk '{print $5}')
+    echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+fi
+
+# Download file tema
 for FILE in $THEME_FILES; do
     printf "        ${DIM}%-20s${NC} " "$FILE"
     do_wget "$THEME_BASE_URL/$FILE" "$INSTALL_PATH/$FILE"
     if [ $? -ne 0 ] || [ ! -s "$INSTALL_PATH/$FILE" ]; then
-        # File opsional (bg.gif, bgmp4.gif) tidak wajib ada
         case "$FILE" in
             logol.png|logor.png|bgmp4.gif)
                 echo -e "${DIM}skipped${NC} ${DIM}(not used by this theme)${NC}"
@@ -255,30 +272,29 @@ echo -e "${BGREEN}done${NC}"
 
 echo -ne "  ${CYAN}[5/5]${NC}  Configuring boot hooks...               "
 
-# Inject bg-video.js ke tomato.js agar load di semua halaman
+# Inject script yang aktif (adaptive.js atau bg-video.js) ke tomato.js
 if [ -f "$INSTALL_PATH/tomato.js" ]; then
-    if ! grep -q "bg-video.js" "$INSTALL_PATH/tomato.js"; then
-        echo 'document.addEventListener("DOMContentLoaded",function(){var s=document.createElement("script");s.src="/bg-video.js";document.head.appendChild(s);});' >> "$INSTALL_PATH/tomato.js"
+    if ! grep -q "$VIDEO_SCRIPT" "$INSTALL_PATH/tomato.js"; then
+        echo "document.addEventListener(\"DOMContentLoaded\",function(){var s=document.createElement(\"script\");s.src=\"/$VIDEO_SCRIPT\";document.head.appendChild(s);});" >> "$INSTALL_PATH/tomato.js"
     fi
 fi
 
 SAFE_PATH=$(echo "$INSTALL_PATH" | tr -cd 'a-zA-Z0-9/_-')
+SAFE_SCRIPT=$(echo "$VIDEO_SCRIPT" | tr -cd 'a-zA-Z0-9/_.-')
 
 CLEAN_INIT=$(nvram get script_init | awk '/# --- Theme Startup ---/{found=1} found{next} {print} /# --- End Theme Startup ---/{found=0}')
 
 HOOK="# --- Theme Startup ---
 sleep 10
 [ -d $SAFE_PATH ] || exit 0
-grep -q bg-video.js $SAFE_PATH/tomato.js 2>/dev/null || echo 'document.addEventListener(\"DOMContentLoaded\",function(){var s=document.createElement(\"script\");s.src=\"/bg-video.js\";document.head.appendChild(s);});' >> $SAFE_PATH/tomato.js
+grep -q $SAFE_SCRIPT $SAFE_PATH/tomato.js 2>/dev/null || echo 'document.addEventListener(\"DOMContentLoaded\",function(){var s=document.createElement(\"script\");s.src=\"/$SAFE_SCRIPT\";document.head.appendChild(s);});' >> $SAFE_PATH/tomato.js
 mount | grep -q $SAFE_PATH || { mount --bind $SAFE_PATH /www && service httpd restart; }
 # --- End Theme Startup ---"
 
 if [ -n "$(nvram get script_init)" ]; then
-    # Ada isi — hapus blok theme lama, sisakan konfigurasi custom user
     nvram set script_init="$CLEAN_INIT
 $HOOK"
 else
-    # Kosong — tulis hook langsung
     nvram set script_init="$HOOK"
 fi
 nvram commit >/dev/null 2>&1
@@ -295,9 +311,10 @@ divider
 echo ""
 echo -e "  ${BGREEN}✔  Installation complete!${NC}"
 echo ""
-echo -e "  ${WHITE}Theme   ${NC}${PINK}$SELECTED_NAME${NC}"
-echo -e "  ${WHITE}Path    ${NC}${DIM}$INSTALL_PATH${NC}"
-echo -e "  ${WHITE}Status  ${NC}${BGREEN}Active & persistent across reboots${NC}"
+echo -e "  ${WHITE}Theme     ${NC}${PINK}$SELECTED_NAME${NC}"
+echo -e "  ${WHITE}Path      ${NC}${DIM}$INSTALL_PATH${NC}"
+echo -e "  ${WHITE}Script    ${NC}${DIM}$VIDEO_SCRIPT${NC}"
+echo -e "  ${WHITE}Status    ${NC}${BGREEN}Active & persistent across reboots${NC}"
 echo ""
 echo -e "  ${YELLOW}⚑  Press Ctrl+F5 in your browser to clear cache.${NC}"
 echo ""
