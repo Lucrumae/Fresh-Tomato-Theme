@@ -287,23 +287,18 @@ echo -e "${BGREEN}done${NC}"
 
 echo -ne "  ${CYAN}[5/5]${NC}  Configuring boot hooks...               "
 
-# Download login.html dari folder tema (opsional)
+# Download login.html
 printf "        ${DIM}%-20s${NC} " "login.html"
 do_wget "$THEME_BASE_URL/login.html" "$INSTALL_PATH/login.html"
-if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/login.html" ]; then
+if [ $? -ne 0 ] || [ ! -s "$INSTALL_PATH/login.html" ]; then
+    do_wget "$BASE_URL/login.html" "$INSTALL_PATH/login.html" 2>/dev/null
+fi
+if [ -s "$INSTALL_PATH/login.html" ]; then
     SIZE=$(ls -lh "$INSTALL_PATH/login.html" | awk '{print $5}')
     echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
-    ok "login.html installed"
 else
-    # Fallback: download dari main
-    do_wget "$BASE_URL/login.html" "$INSTALL_PATH/login.html" 2>/dev/null
-    if [ ! -s "$INSTALL_PATH/login.html" ]; then
-        rm -f "$INSTALL_PATH/login.html" 2>/dev/null
-        echo -e "${DIM}skipped${NC}"
-    else
-        SIZE=$(ls -lh "$INSTALL_PATH/login.html" | awk '{print $5}')
-        echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
-    fi
+    rm -f "$INSTALL_PATH/login.html" 2>/dev/null
+    echo -e "${DIM}skipped${NC}"
 fi
 
 # Inject script yang aktif (adaptive.js atau bg-video.js) ke tomato.js
@@ -316,12 +311,35 @@ fi
 SAFE_PATH=$(echo "$INSTALL_PATH" | tr -cd 'a-zA-Z0-9/_-')
 SAFE_SCRIPT=$(echo "$VIDEO_SCRIPT" | tr -cd 'a-zA-Z0-9/_.-')
 
+# ---------------------------------------------------------------
+# SETUP CUSTOM LOGIN PAGE (Opsi A — Basic Auth tetap aktif)
+# login.html melakukan fetch ke /index.asp dengan Basic Auth header.
+# Browser tidak pernah lihat popup — tapi keamanan tetap terjaga.
+# index.html → redirect ke login.html agar jadi halaman default.
+# ---------------------------------------------------------------
+
+if [ -s "$INSTALL_PATH/login.html" ]; then
+    # Buat index.html sebagai redirect ke login.html
+    cat > "$INSTALL_PATH/index.html" << 'IDXEOF'
+<!DOCTYPE html><html><head><meta charset="UTF-8">
+<meta http-equiv="refresh" content="0;url=/login.html">
+<script>window.location.replace('/login.html');</script>
+</head><body></body></html>
+IDXEOF
+    ok "Custom login page active (Basic Auth still enabled)"
+else
+    warn "login.html not found — keeping default Basic Auth"
+fi
+
+# ---------------------------------------------------------------
+# BOOT HOOK
+# ---------------------------------------------------------------
 CLEAN_INIT=$(nvram get script_init | awk '/# --- Theme Startup ---/{found=1} found{next} {print} /# --- End Theme Startup ---/{found=0}')
 
 HOOK="# --- Theme Startup ---
 sleep 10
 [ -d $SAFE_PATH ] || exit 0
-grep -q $SAFE_SCRIPT $SAFE_PATH/tomato.js 2>/dev/null || echo 'document.addEventListener(\"DOMContentLoaded\",function(){var s=document.createElement(\"script\");s.src=\"/$SAFE_SCRIPT\";document.head.appendChild(s);});' >> $SAFE_PATH/tomato.js
+grep -q $SAFE_SCRIPT $SAFE_PATH/tomato.js 2>/dev/null || echo 'document.addEventListener("DOMContentLoaded",function(){var s=document.createElement("script");s.src="/$SAFE_SCRIPT";document.head.appendChild(s);});' >> $SAFE_PATH/tomato.js
 mount | grep -q $SAFE_PATH || { mount --bind $SAFE_PATH /www && service httpd restart; }
 # --- End Theme Startup ---"
 
