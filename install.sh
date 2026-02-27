@@ -164,8 +164,9 @@ for FILE in $THEME_FILES; do
     fi
 done
 
-# login.html — coba dari theme folder dulu, fallback ke root repo
+# login.html — generate langsung (tidak depend ke GitHub)
 printf "        ${DIM}%-22s${NC} " "login.html"
+# Download dulu sebagai base untuk CSS/layout
 do_wget "$THEME_BASE_URL/login.html" "$INSTALL_PATH/login.html"
 if [ $? -ne 0 ] || [ ! -s "$INSTALL_PATH/login.html" ]; then
     do_wget "$BASE_URL/login.html" "$INSTALL_PATH/login.html" 2>/dev/null
@@ -173,7 +174,40 @@ fi
 if [ -s "$INSTALL_PATH/login.html" ]; then
     SIZE=$(ls -lh "$INSTALL_PATH/login.html" | awk '{print $5}')
     echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
-    # Selalu sync ke nginx/static juga (dibuat di fase 6)
+
+    # Patch session logic: ganti sessionStorage dengan cookie-only
+    # Ini memastikan logout benar-benar clear session
+    TMPF="/tmp/login_patch.html"
+
+    # Hapus script sessionStorage lama jika ada, inject cookie script setelah <head>
+    awk '
+    /^<head>$/ {
+        print $0
+        print "<script>"
+        print "(function(){"
+        print "  function getCookie(n){"
+        print "    var m=document.cookie.match("(?:^|; )"+n+"=([^;]*)");"
+        print "    return m?m[1]:"";"
+        print "  }"
+        print "  var p=new URLSearchParams(window.location.search);"
+        print "  if(p.get("logout")==="1"){"
+        print "    document.cookie="ft_auth=; Path=/; Max-Age=0; SameSite=Lax";"
+        print "    history.replaceState(null,"","/login.html");"
+        print "  }else if(getCookie("ft_auth")){"
+        print "    window.location.replace("/index.asp");"
+        print "  }"
+        print "})();"
+        print "</script>"
+        next
+    }
+    # Hapus blok script sessionStorage lama (antara <script> setelah <head> dan </script>)
+    /^<script>$/ && !patched { skip=1; next }
+    /^<\/script>$/ && skip { skip=0; patched=1; next }
+    skip { next }
+    { print }
+    ' "$INSTALL_PATH/login.html" > "$TMPF"
+
+    cp "$TMPF" "$INSTALL_PATH/login.html"
     mkdir -p "$NGINX_PATH/static"
     cp "$INSTALL_PATH/login.html" "$NGINX_PATH/static/login.html"
 else
