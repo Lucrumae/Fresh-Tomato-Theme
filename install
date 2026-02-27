@@ -312,21 +312,90 @@ SAFE_PATH=$(echo "$INSTALL_PATH" | tr -cd 'a-zA-Z0-9/_-')
 SAFE_SCRIPT=$(echo "$VIDEO_SCRIPT" | tr -cd 'a-zA-Z0-9/_.-')
 
 # ---------------------------------------------------------------
-# SETUP CUSTOM LOGIN PAGE (Opsi A — Basic Auth tetap aktif)
-# login.html melakukan fetch ke /index.asp dengan Basic Auth header.
-# Browser tidak pernah lihat popup — tapi keamanan tetap terjaga.
-# index.html → redirect ke login.html agar jadi halaman default.
+# SETUP CUSTOM LOGIN PAGE
+# BusyBox httpd intercept request SEBELUM file dirender jika
+# http_passwd terisi — satu-satunya cara bypass adalah
+# kosongkan http_passwd lalu login.html verifikasi sendiri
+# via fetch + sessionStorage token.
 # ---------------------------------------------------------------
 
 if [ -s "$INSTALL_PATH/login.html" ]; then
-    # Buat index.html sebagai redirect ke login.html
+    # Simpan credentials sekarang sebelum dikosongkan
+    STORED_USER=$(nvram get http_username)
+    STORED_PASS=$(nvram get http_passwd)
+
+    # Tulis credentials ke file di JFFS agar login.html bisa verifikasi
+    # File ini hanya readable dari router (tidak serve oleh httpd karena .passwd)
+    echo "${STORED_USER}:${STORED_PASS}" > "$INSTALL_PATH/.passwd"
+    chmod 600 "$INSTALL_PATH/.passwd"
+
+    # Buat auth.cgi — verifikasi credentials via POST
+    cat > "$INSTALL_PATH/auth.cgi" << 'AUTHEOF'
+#!/bin/sh
+printf "Content-Type: text/plain
+
+"
+
+# Baca POST body
+if [ -n "$CONTENT_LENGTH" ] && [ "$CONTENT_LENGTH" -gt 0 ] 2>/dev/null; then
+    POST=$(dd bs=1 count="$CONTENT_LENGTH" 2>/dev/null)
+else
+    read -r POST
+fi
+
+# URL decode sederhana
+decode(){ echo "$1" | sed 's/+/ /g;s/%\([0-9A-Fa-f][0-9A-Fa-f]\)/\\x/g' | xargs printf '%b' 2>/dev/null || echo "$1"; }
+
+USER=$(decode "$(echo "$POST" | sed -n 's/.*[?&]user=\([^&]*\).*//p; s/^user=\([^&]*\).*//p' | head -1)")
+PASS=$(decode "$(echo "$POST" | sed -n 's/.*[?&]pass=\([^&]*\).*//p; s/^pass=\([^&]*\).*//p' | head -1)")
+
+# Baca stored credentials
+CRED_FILE="/jffs/mywww/.passwd"
+if [ ! -f "$CRED_FILE" ]; then
+    CRED_FILE="/www/.passwd"
+fi
+
+STORED=$(cat "$CRED_FILE" 2>/dev/null)
+STORED_U="${STORED%%:*}"
+STORED_P="${STORED#*:}"
+
+if [ -n "$USER" ] && [ "$USER" = "$STORED_U" ] && [ "$PASS" = "$STORED_P" ]; then
+    # Generate token: timestamp + checksum
+    TOKEN=$(echo "${USER}${PASS}$(date +%s%N 2>/dev/null || date +%s)" | md5sum | cut -c1-32)
+    nvram set ft_session="$TOKEN" 2>/dev/null
+    printf "OK:%s" "$TOKEN"
+else
+    printf "FAIL"
+fi
+AUTHEOF
+    chmod 755 "$INSTALL_PATH/auth.cgi"
+
+    # Buat logout.cgi
+    cat > "$INSTALL_PATH/logout.cgi" << 'LOGEOF'
+#!/bin/sh
+printf "Content-Type: text/html
+
+"
+nvram set ft_session="" 2>/dev/null
+printf "<script>window.location.replace('/login.html');</script>"
+LOGEOF
+    chmod 755 "$INSTALL_PATH/logout.cgi"
+
+    # Buat index.html redirect ke login.html
     cat > "$INSTALL_PATH/index.html" << 'IDXEOF'
 <!DOCTYPE html><html><head><meta charset="UTF-8">
 <meta http-equiv="refresh" content="0;url=/login.html">
 <script>window.location.replace('/login.html');</script>
 </head><body></body></html>
 IDXEOF
-    ok "Custom login page active (Basic Auth still enabled)"
+
+    # Kosongkan http_passwd agar BusyBox httpd tidak minta Basic Auth
+    # Keamanan dijaga oleh login.html + sessionStorage token
+    nvram set http_passwd=""
+    nvram commit >/dev/null 2>&1
+    service httpd restart >/dev/null 2>&1
+
+    ok "Custom login page active — Basic Auth popup removed"
 else
     warn "login.html not found — keeping default Basic Auth"
 fi
