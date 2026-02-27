@@ -15,7 +15,28 @@
     var src=document.createElement('source');
     src.src='/bgmp4.gif'; src.type='video/mp4';
     vid.appendChild(src);
-    function insertVideo(){if(document.body)document.body.insertBefore(vid,document.body.firstChild);else document.addEventListener('DOMContentLoaded',function(){document.body.insertBefore(vid,document.body.firstChild);});}
+    function insertVideo(){
+        if(document.body){
+            document.body.insertBefore(vid,document.body.firstChild);
+            vid.play().catch(function(){
+                // Autoplay diblokir — coba lagi saat user interaksi pertama
+                document.addEventListener('click', function retry(){
+                    document.removeEventListener('click', retry);
+                    vid.play().catch(function(){});
+                }, {once:true});
+            });
+        } else {
+            document.addEventListener('DOMContentLoaded',function(){
+                document.body.insertBefore(vid,document.body.firstChild);
+                vid.play().catch(function(){
+                    document.addEventListener('click', function retry(){
+                        document.removeEventListener('click', retry);
+                        vid.play().catch(function(){});
+                    }, {once:true});
+                });
+            });
+        }
+    }
     insertVideo();
 
     function rgbToHsl(r,g,b){r/=255;g/=255;b/=255;var max=Math.max(r,g,b),min=Math.min(r,g,b),h,s,l=(max+min)/2;if(max===min){h=s=0;}else{var d=max-min;s=l>0.5?d/(2-max-min):d/(max+min);switch(max){case r:h=((g-b)/d+(g<b?6:0))/6;break;case g:h=((b-r)/d+2)/6;break;case b:h=((r-g)/d+4)/6;break;}}return[h*360,s*100,l*100];}
