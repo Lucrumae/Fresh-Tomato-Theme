@@ -4,10 +4,14 @@
 # GLOBAL CONFIGURATION
 # =================================================================
 BASE_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main"
+THEME_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme"
 LIST_FILE="ThemeList.txt"
 INSTALL_PATH="/jffs/mywww"
 NGINX_PATH="/jffs/nginx"
 TEMP_WORKSPACE="/tmp/theme_deploy"
+
+# File yang didownload langsung dari folder theme (tanpa tar)
+THEME_FILES="default.css logol.png logor.png bgmp4.gif"
 
 # ANSI Colors
 CYAN='\033[0;36m'
@@ -25,15 +29,15 @@ cleanup() { [ -d "$TEMP_WORKSPACE" ] && rm -rf "$TEMP_WORKSPACE"; }
 trap cleanup EXIT INT TERM
 
 divider() { echo -e "${DIM}  ────────────────────────────────────────────────${NC}"; }
-ok()      { echo -e "  ${BGREEN}✔${NC}  $1"; }
-fail()    { echo -e "  ${RED}✘${NC}  $1"; }
-info()    { echo -e "  ${CYAN}→${NC}  $1"; }
-warn()    { echo -e "  ${YELLOW}⚠${NC}  $1"; }
+ok()   { echo -e "  ${BGREEN}✔${NC}  $1"; }
+fail() { echo -e "  ${RED}✘${NC}  $1"; }
+info() { echo -e "  ${CYAN}→${NC}  $1"; }
+warn() { echo -e "  ${YELLOW}⚠${NC}  $1"; }
 
 do_wget() { wget --no-check-certificate -T 15 "$1" -O "$2" 2>/dev/null; }
 
 # =================================================================
-# PHASE 1: THEME SELECTION
+# PHASE 1: THEME SELECTION MENU
 # =================================================================
 clear
 echo ""
@@ -49,15 +53,16 @@ divider
 echo ""
 
 mkdir -p "$TEMP_WORKSPACE"
-echo -ne "  ${CYAN}↓${NC}  Fetching theme catalog... "
+echo -ne "  ${CYAN}↓${NC}  Fetching theme catalog from GitHub... "
 do_wget "$BASE_URL/$LIST_FILE" "$TEMP_WORKSPACE/list.txt"
 if [ ! -s "$TEMP_WORKSPACE/list.txt" ]; then
     echo -e "${RED}failed${NC}"
-    fail "Cannot reach GitHub. Check internet connection."
+    fail "Unable to reach GitHub. Check your internet connection."
     exit 1
 fi
 echo -e "${BGREEN}done${NC}"
 echo ""
+
 echo -e "  ${WHITE}Available Themes${NC}"
 divider
 
@@ -73,7 +78,7 @@ while IFS='|' read -r name folder || [ -n "$name" ]; do
 done < "$TEMP_WORKSPACE/list.txt"
 
 total_themes=$((i-1))
-[ "$total_themes" -eq 0 ] && fail "No themes found." && exit 1
+[ "$total_themes" -eq 0 ] && fail "No themes found in catalog." && exit 1
 
 divider
 echo ""
@@ -87,7 +92,7 @@ esac
 
 SELECTED_NAME=$(sed -n "${choice}p" "$TEMP_WORKSPACE/names.txt")
 SELECTED_FOLDER=$(sed -n "${choice}p" "$TEMP_WORKSPACE/folders.txt")
-THEME_BASE_URL="$BASE_URL/$SELECTED_FOLDER"
+THEME_BASE_URL="$THEME_URL/$SELECTED_FOLDER"
 
 # =================================================================
 # PHASE 2: SYSTEM CHECKS
@@ -97,10 +102,12 @@ echo -e "  ${WHITE}System Checks${NC}"
 divider
 
 ! mount | grep -q "/jffs" && fail "JFFS not mounted. Enable JFFS in Administration first." && exit 1
-ok "JFFS partition active"
+ok "JFFS partition is active"
 
 FREE_JFFS=$(df -k /jffs | awk 'NR==2 {print $4}')
-[ "$FREE_JFFS" -lt 10240 ] && warn "Low JFFS space (${FREE_JFFS}KB)" || ok "JFFS space OK (${FREE_JFFS}KB free)"
+[ "$FREE_JFFS" -lt 10240 ] \
+    && warn "Low JFFS space (${FREE_JFFS}KB free). Installation may fail." \
+    || ok "Sufficient JFFS space (${FREE_JFFS}KB free)"
 
 # Cek nginx
 if ! which nginx > /dev/null 2>&1; then
@@ -116,97 +123,153 @@ echo -e "  ${WHITE}Installing:${NC} ${PINK}$SELECTED_NAME${NC}"
 divider
 
 # =================================================================
-# PHASE 3: PREPARATION
+# PHASE 3: PREPARATION & MIRRORING
 # =================================================================
 echo -ne "  ${CYAN}[1/5]${NC}  Checking previous installation...       "
+
 if [ -d "$INSTALL_PATH" ] && [ "$(ls -A $INSTALL_PATH 2>/dev/null)" ]; then
     echo -e "${YELLOW}found${NC}"
-    warn "Previous installation at ${DIM}$INSTALL_PATH${NC}"
-    printf "  Overwrite? (y/n): "
+    echo ""
+    warn "Previous installation detected at ${DIM}$INSTALL_PATH${NC}"
+    echo ""
+    printf "  Overwrite and continue? (y/n): "
     read confirm < /dev/tty
+    echo ""
     case "$confirm" in
         y|Y)
-            echo -ne "  ${CYAN}[1/5]${NC}  Removing previous...                    "
+            echo -ne "  ${CYAN}[1/5]${NC}  Removing previous installation...       "
             mount | grep -q " /www " && umount -l /www 2>/dev/null
             rm -rf "$INSTALL_PATH"
             echo -e "${BGREEN}done${NC}"
             ;;
-        *) info "Cancelled."; exit 0 ;;
+        *) info "Installation cancelled."; exit 0 ;;
     esac
 else
     echo -e "${BGREEN}clean${NC}"
     mount | grep -q " /www " && umount -l /www 2>/dev/null
 fi
 
-echo -ne "  ${CYAN}[2/5]${NC}  Mirroring /www to JFFS...               "
+echo -ne "  ${CYAN}[2/5]${NC}  Mirroring /www to JFFS storage...       "
 mkdir -p "$INSTALL_PATH"
 cp -a /www/. "$INSTALL_PATH/"
 rm -f "$INSTALL_PATH/default.css"
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
-# PHASE 4: DOWNLOAD & DEPLOY
+# PHASE 4: DOWNLOAD THEME FILES
 # =================================================================
-THEME_URL="$THEME_BASE_URL/Theme.tar"
-echo -ne "  ${CYAN}[3/5]${NC}  Downloading theme...                    "
-do_wget "$THEME_URL" "$TEMP_WORKSPACE/Theme.tar"
-if [ $? -ne 0 ] || [ ! -s "$TEMP_WORKSPACE/Theme.tar" ]; then
-    echo -e "${RED}failed${NC}"
-    fail "Cannot download Theme.tar"
+failed_files=""
+
+echo -e "  ${CYAN}[3/5]${NC}  Downloading theme files..."
+echo ""
+
+# ── Video / Adaptive Script (prioritas deteksi) ──────────────────
+VIDEO_SCRIPT="bg-video.js"
+
+printf "        ${DIM}%-20s${NC} " "adaptiverealtime.js"
+do_wget "$THEME_BASE_URL/adaptiverealtime.js" "$INSTALL_PATH/adaptiverealtime.js"
+if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/adaptiverealtime.js" ]; then
+    SIZE=$(ls -lh "$INSTALL_PATH/adaptiverealtime.js" | awk '{print $5}')
+    echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+    VIDEO_SCRIPT="adaptiverealtime.js"
+else
+    rm -f "$INSTALL_PATH/adaptiverealtime.js" 2>/dev/null
+    echo -e "${DIM}skipped${NC}"
+
+    printf "        ${DIM}%-20s${NC} " "adaptive.js"
+    do_wget "$THEME_BASE_URL/adaptive.js" "$INSTALL_PATH/adaptive.js"
+    if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/adaptive.js" ]; then
+        SIZE=$(ls -lh "$INSTALL_PATH/adaptive.js" | awk '{print $5}')
+        echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+        VIDEO_SCRIPT="adaptive.js"
+    else
+        rm -f "$INSTALL_PATH/adaptive.js" 2>/dev/null
+        echo -e "${DIM}skipped${NC}"
+
+        printf "        ${DIM}%-20s${NC} " "bg-video.js"
+        do_wget "$BASE_URL/bg-video.js" "$INSTALL_PATH/bg-video.js"
+        if [ $? -ne 0 ] || [ ! -s "$INSTALL_PATH/bg-video.js" ]; then
+            echo -e "${RED}failed${NC}"
+            fail "Could not download bg-video.js."
+            exit 1
+        fi
+        SIZE=$(ls -lh "$INSTALL_PATH/bg-video.js" | awk '{print $5}')
+        echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+    fi
+fi
+
+# ── Theme static files ────────────────────────────────────────────
+for FILE in $THEME_FILES; do
+    printf "        ${DIM}%-20s${NC} " "$FILE"
+    do_wget "$THEME_BASE_URL/$FILE" "$INSTALL_PATH/$FILE"
+    if [ $? -ne 0 ] || [ ! -s "$INSTALL_PATH/$FILE" ]; then
+        case "$FILE" in
+            logol.png|logor.png|bgmp4.gif)
+                echo -e "${DIM}skipped${NC} ${DIM}(optional)${NC}"
+                ;;
+            *)
+                echo -e "${RED}failed${NC}"
+                failed_files="$failed_files $FILE"
+                ;;
+        esac
+    else
+        SIZE=$(ls -lh "$INSTALL_PATH/$FILE" | awk '{print $5}')
+        echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+    fi
+done
+
+# ── login.html ────────────────────────────────────────────────────
+printf "        ${DIM}%-20s${NC} " "login.html"
+do_wget "$THEME_BASE_URL/login.html" "$INSTALL_PATH/login.html"
+if [ $? -ne 0 ] || [ ! -s "$INSTALL_PATH/login.html" ]; then
+    do_wget "$BASE_URL/login.html" "$INSTALL_PATH/login.html" 2>/dev/null
+fi
+if [ -s "$INSTALL_PATH/login.html" ]; then
+    SIZE=$(ls -lh "$INSTALL_PATH/login.html" | awk '{print $5}')
+    echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+else
+    rm -f "$INSTALL_PATH/login.html" 2>/dev/null
+    echo -e "${DIM}skipped${NC}"
+fi
+
+echo ""
+
+if [ -n "$failed_files" ]; then
+    fail "Required files failed to download:$failed_files"
     exit 1
 fi
-echo -e "${BGREEN}done${NC}"
 
-echo -ne "  ${CYAN}[4/5]${NC}  Extracting theme assets...              "
-tar -xf "$TEMP_WORKSPACE/Theme.tar" -C "$INSTALL_PATH/" 2>/dev/null
-[ $? -ne 0 ] && echo -e "${RED}failed${NC}" && fail "Extraction failed." && exit 1
+# =================================================================
+# PHASE 5: PERMISSIONS
+# =================================================================
+echo -ne "  ${CYAN}[4/5]${NC}  Setting permissions...                  "
+chmod 755 "$INSTALL_PATH"
+chmod 644 "$INSTALL_PATH"/* 2>/dev/null
+chmod 755 "$INSTALL_PATH"/*.sh  2>/dev/null
+chmod 755 "$INSTALL_PATH"/*.cgi 2>/dev/null
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
-# PHASE 5: LOGIN PAGE + NGINX SETUP
+# PHASE 6: LOGIN PAGE + NGINX + BOOT HOOK
 # =================================================================
-echo -ne "  ${CYAN}[5/5]${NC}  Setting up login page & boot hooks...   "
+echo -ne "  ${CYAN}[5/5]${NC}  Configuring login page & boot hooks...  "
 
-# Deteksi VIDEO_SCRIPT
-if [ -f "$INSTALL_PATH/adaptiverealtime.js" ]; then
-    VIDEO_SCRIPT="adaptiverealtime.js"
-elif [ -f "$INSTALL_PATH/adaptive.js" ]; then
-    VIDEO_SCRIPT="adaptive.js"
-else
-    VIDEO_SCRIPT="bg-video.js"
-fi
-
-# Inject script ke tomato.js
+# Inject video script ke tomato.js
 if [ -f "$INSTALL_PATH/tomato.js" ]; then
     if ! grep -q "$VIDEO_SCRIPT" "$INSTALL_PATH/tomato.js"; then
         echo "document.addEventListener(\"DOMContentLoaded\",function(){var s=document.createElement(\"script\");s.src=\"/$VIDEO_SCRIPT\";document.head.appendChild(s);});" >> "$INSTALL_PATH/tomato.js"
     fi
 fi
 
-# Permissions
-chmod 755 "$INSTALL_PATH"
-chmod 644 "$INSTALL_PATH"/* 2>/dev/null
-chmod 755 "$INSTALL_PATH"/*.cgi 2>/dev/null
+SAFE_PATH=$(echo "$INSTALL_PATH" | tr -cd 'a-zA-Z0-9/_-')
+SAFE_SCRIPT=$(echo "$VIDEO_SCRIPT" | tr -cd 'a-zA-Z0-9/_.-')
 
-# Download login.html
-do_wget "$THEME_BASE_URL/login.html" "$INSTALL_PATH/login.html" 2>/dev/null
-[ ! -s "$INSTALL_PATH/login.html" ] && do_wget "$BASE_URL/login.html" "$INSTALL_PATH/login.html" 2>/dev/null
-
-# Buat index.html redirect
-cat > "$INSTALL_PATH/index.html" << 'IDXEOF'
-<!DOCTYPE html><html><head><meta charset="UTF-8">
-<meta http-equiv="refresh" content="0;url=/login.html">
-<script>window.location.replace('/login.html');</script>
-</head><body></body></html>
-IDXEOF
-
-# Simpan credentials ke .passwd
+# ── Simpan credentials & buat auth.cgi ───────────────────────────
 HTTP_USER=$(nvram get http_username)
 HTTP_PASS=$(nvram get http_passwd)
 echo "${HTTP_USER}:${HTTP_PASS}" > "$INSTALL_PATH/.passwd"
 chmod 600 "$INSTALL_PATH/.passwd"
 
-# Buat auth.cgi
 cat > "$INSTALL_PATH/auth.cgi" << 'AUTHEOF'
 #!/bin/sh
 printf "Content-Type: text/plain\r\n\r\n"
@@ -225,14 +288,16 @@ fi
 AUTHEOF
 chmod 755 "$INSTALL_PATH/auth.cgi"
 
-SAFE_PATH=$(echo "$INSTALL_PATH" | tr -cd 'a-zA-Z0-9/_-')
-SAFE_SCRIPT=$(echo "$VIDEO_SCRIPT" | tr -cd 'a-zA-Z0-9/_.-')
+# ── index.html redirect ───────────────────────────────────────────
+cat > "$INSTALL_PATH/index.html" << 'IDXEOF'
+<!DOCTYPE html><html><head><meta charset="UTF-8">
+<meta http-equiv="refresh" content="0;url=/login.html">
+<script>window.location.replace('/login.html');</script>
+</head><body></body></html>
+IDXEOF
 
-# =================================================================
-# NGINX SETUP (jika tersedia)
-# =================================================================
-if [ "$HAS_NGINX" -eq 1 ]; then
-    # Generate B64 credentials untuk nginx
+# ── NGINX SETUP ───────────────────────────────────────────────────
+if [ "$HAS_NGINX" -eq 1 ] && [ -s "$INSTALL_PATH/login.html" ]; then
     B64=$(echo -n "${HTTP_USER}:${HTTP_PASS}" | openssl base64 | tr -d '\n')
 
     # Pindahkan httpd ke port 8008
@@ -242,19 +307,18 @@ if [ "$HAS_NGINX" -eq 1 ]; then
     sleep 2
 
     # Buat nginx dirs
-    mkdir -p "$NGINX_PATH"
+    mkdir -p "$NGINX_PATH" "$NGINX_PATH/static"
     mkdir -p /var/log/nginx /var/lib/nginx/client /var/lib/nginx/proxy
 
-    # Buat static folder (tanpa .asp agar nginx tidak serve mentah)
-    mkdir -p "$NGINX_PATH/static"
-    cp "$INSTALL_PATH"/*.css "$NGINX_PATH/static/" 2>/dev/null
-    cp "$INSTALL_PATH"/*.js  "$NGINX_PATH/static/" 2>/dev/null
-    cp "$INSTALL_PATH"/*.png "$NGINX_PATH/static/" 2>/dev/null
-    cp "$INSTALL_PATH"/*.ico "$NGINX_PATH/static/" 2>/dev/null
+    # Salin static files ke nginx/static (TANPA .asp agar tidak serve mentah)
+    cp "$INSTALL_PATH"/*.css  "$NGINX_PATH/static/" 2>/dev/null
+    cp "$INSTALL_PATH"/*.js   "$NGINX_PATH/static/" 2>/dev/null
+    cp "$INSTALL_PATH"/*.png  "$NGINX_PATH/static/" 2>/dev/null
+    cp "$INSTALL_PATH"/*.ico  "$NGINX_PATH/static/" 2>/dev/null
     cp "$INSTALL_PATH/login.html" "$NGINX_PATH/static/" 2>/dev/null
     cp "$INSTALL_PATH/bgmp4.gif"  "$NGINX_PATH/static/" 2>/dev/null
 
-    # Buat mime.types
+    # mime.types
     cat > "$NGINX_PATH/mime.types" << 'MIMEEOF'
 types {
     text/html                 html htm;
@@ -272,7 +336,8 @@ types {
 }
 MIMEEOF
 
-    # Buat nginx.conf
+    # nginx.conf
+    HTTPD_IP="192.168.1.1"
     cat > "$NGINX_PATH/nginx.conf" << NGINXEOF
 user nobody;
 worker_processes 1;
@@ -304,26 +369,21 @@ http {
         location = / {
             try_files /login.html =404;
         }
-
         location = /login.html {
             try_files \$uri =404;
         }
-
         location ~* ^/logout {
             return 302 /login.html?logout=1;
         }
-
         location = /bgmp4.gif {
             types { video/mp4 gif; }
             try_files \$uri =404;
         }
-
         location ~* \.(css|js|png|jpg|jpeg|ico|svg|woff|woff2|html)$ {
             try_files \$uri @proxy;
         }
-
         location / {
-            proxy_pass http://192.168.1.1:8008;
+            proxy_pass http://$HTTPD_IP:8008;
             proxy_set_header Authorization \$auth_header;
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
@@ -331,9 +391,8 @@ http {
             proxy_set_header Connection "";
             proxy_buffering on;
         }
-
         location @proxy {
-            proxy_pass http://192.168.1.1:8008;
+            proxy_pass http://$HTTPD_IP:8008;
             proxy_set_header Authorization \$auth_header;
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
@@ -343,16 +402,14 @@ http {
 }
 NGINXEOF
 
-    # Test dan start nginx
-    nginx -c "$NGINX_PATH/nginx.conf" -t >/dev/null 2>&1
-    if [ $? -eq 0 ]; then
-        pkill nginx 2>/dev/null
-        sleep 1
+    # Start nginx
+    nginx -c "$NGINX_PATH/nginx.conf" -t >/dev/null 2>&1 && {
+        pkill nginx 2>/dev/null; sleep 1
         nginx -c "$NGINX_PATH/nginx.conf"
-    fi
+    }
 
     # Boot hook dengan nginx
-    BOOT_HOOK="# --- Theme Startup ---
+    HOOK="# --- Theme Startup ---
 sleep 10
 [ -d $SAFE_PATH ] || exit 0
 mount | grep -q $SAFE_PATH || mount --bind $SAFE_PATH /www
@@ -365,32 +422,36 @@ pkill nginx 2>/dev/null; sleep 1
 nginx -c $NGINX_PATH/nginx.conf
 # --- End Theme Startup ---"
 
+    LOGIN_STATUS="${BGREEN}Custom login page active (nginx proxy)${NC}"
+
 else
-    # Tanpa nginx — pakai Basic Auth biasa
+    # Fallback tanpa nginx
     mount --bind "$INSTALL_PATH" /www
     service httpd restart >/dev/null 2>&1
 
-    BOOT_HOOK="# --- Theme Startup ---
+    HOOK="# --- Theme Startup ---
 sleep 10
 [ -d $SAFE_PATH ] || exit 0
 mount | grep -q $SAFE_PATH || { mount --bind $SAFE_PATH /www && service httpd restart; }
 grep -q $SAFE_SCRIPT $SAFE_PATH/tomato.js 2>/dev/null || echo 'document.addEventListener(\"DOMContentLoaded\",function(){var s=document.createElement(\"script\");s.src=\"/$SAFE_SCRIPT\";document.head.appendChild(s);});' >> $SAFE_PATH/tomato.js
 # --- End Theme Startup ---"
+
+    LOGIN_STATUS="${YELLOW}Basic Auth (nginx not available)${NC}"
 fi
 
-# Simpan boot hook
+# Mount dan aktivasi
+mount --bind "$INSTALL_PATH" /www
+service httpd restart >/dev/null 2>&1
+
+# Simpan boot hook ke NVRAM
 CLEAN_INIT=$(nvram get script_init | awk '/# --- Theme Startup ---/{f=1} f{next} {print} /# --- End Theme Startup ---/{f=0}')
 if [ -n "$(nvram get script_init)" ]; then
     nvram set script_init="$CLEAN_INIT
-$BOOT_HOOK"
+$HOOK"
 else
-    nvram set script_init="$BOOT_HOOK"
+    nvram set script_init="$HOOK"
 fi
 nvram commit >/dev/null 2>&1
-
-# Mount dan activate
-mount --bind "$INSTALL_PATH" /www
-service httpd restart >/dev/null 2>&1
 
 echo -e "${BGREEN}done${NC}"
 
@@ -405,15 +466,10 @@ echo ""
 echo -e "  ${WHITE}Theme     ${NC}${PINK}$SELECTED_NAME${NC}"
 echo -e "  ${WHITE}Path      ${NC}${DIM}$INSTALL_PATH${NC}"
 echo -e "  ${WHITE}Script    ${NC}${DIM}$VIDEO_SCRIPT${NC}"
-if [ "$HAS_NGINX" -eq 1 ]; then
-echo -e "  ${WHITE}Login     ${NC}${BGREEN}Custom login page (nginx proxy)${NC}"
-echo -e "  ${WHITE}httpd     ${NC}${DIM}port 8008 (behind nginx)${NC}"
-else
-echo -e "  ${WHITE}Login     ${NC}${YELLOW}Basic Auth (nginx not available)${NC}"
-fi
-echo -e "  ${WHITE}Status    ${NC}${BGREEN}Active & persistent${NC}"
+echo -e "  ${WHITE}Login     ${NC}$LOGIN_STATUS"
+echo -e "  ${WHITE}Status    ${NC}${BGREEN}Active & persistent across reboots${NC}"
 echo ""
-echo -e "  ${YELLOW}⚑  Press Ctrl+F5 to clear browser cache.${NC}"
+echo -e "  ${YELLOW}⚑  Press Ctrl+F5 in your browser to clear cache.${NC}"
 echo ""
 divider
 echo ""
