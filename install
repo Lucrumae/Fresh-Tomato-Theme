@@ -287,6 +287,25 @@ echo -e "${BGREEN}done${NC}"
 
 echo -ne "  ${CYAN}[5/5]${NC}  Configuring boot hooks...               "
 
+# Download login.html dari folder tema (opsional)
+printf "        ${DIM}%-20s${NC} " "login.html"
+do_wget "$THEME_BASE_URL/login.html" "$INSTALL_PATH/login.html"
+if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/login.html" ]; then
+    SIZE=$(ls -lh "$INSTALL_PATH/login.html" | awk '{print $5}')
+    echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+    ok "login.html installed"
+else
+    # Fallback: download dari main
+    do_wget "$BASE_URL/login.html" "$INSTALL_PATH/login.html" 2>/dev/null
+    if [ ! -s "$INSTALL_PATH/login.html" ]; then
+        rm -f "$INSTALL_PATH/login.html" 2>/dev/null
+        echo -e "${DIM}skipped${NC}"
+    else
+        SIZE=$(ls -lh "$INSTALL_PATH/login.html" | awk '{print $5}')
+        echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+    fi
+fi
+
 # Inject script yang aktif (adaptive.js atau bg-video.js) ke tomato.js
 if [ -f "$INSTALL_PATH/tomato.js" ]; then
     if ! grep -q "$VIDEO_SCRIPT" "$INSTALL_PATH/tomato.js"; then
