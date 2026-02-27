@@ -1,45 +1,24 @@
-/* adaptiverealtime.js — FreshTomato True Realtime Adaptive Theme
+/* adaptiverealtime.js — FreshTomato Realtime Adaptive Theme
    - requestAnimationFrame + throttle 100ms
-   - Mengutamakan warna cerah & kontras (WCAG)
-   - Controls muncul saat kursor dekat pojok kanan bawah
+   - sessionStorage cache agar tidak flicker saat refresh
+   - "Click to unmute" hint saat refresh dengan audio ON
+   - Controls muncul saat kursor dekat (80px)
 */
 (function () {
 
-    var vidStyle = document.createElement('style');
-    vidStyle.textContent =
-        '#bg-video{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:-1;object-fit:cover;object-position:center center;pointer-events:none;}' +
-        '*{transition:background-color 0.8s ease,border-color 0.8s ease,color 0.8s ease!important;}' +
+    var vidStyle=document.createElement('style');
+    vidStyle.textContent=
+        '#bg-video{position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:-1;object-fit:cover;object-position:center center;pointer-events:none;}'+
+        '*{transition:background-color 0.8s ease,border-color 0.8s ease,color 0.8s ease!important;}'+
         'a,input,select,textarea,button{transition-duration:0.15s!important;}';
     document.head.appendChild(vidStyle);
 
-    var vid = document.createElement('video');
+    var vid=document.createElement('video');
     vid.id='bg-video'; vid.autoplay=vid.loop=vid.muted=vid.playsInline=true;
     vid.setAttribute('playsinline',''); vid.crossOrigin='anonymous';
     var src=document.createElement('source');
     src.src='/bgmp4.gif'; src.type='video/mp4';
     vid.appendChild(src);
-    function insertVideo(){
-        if(document.body){
-            document.body.insertBefore(vid,document.body.firstChild);
-            vid.play().catch(function(){
-                document.addEventListener('click', function retry(){
-                    document.removeEventListener('click', retry);
-                    vid.play().catch(function(){});
-                }, {once:true});
-            });
-        } else {
-            document.addEventListener('DOMContentLoaded',function(){
-                document.body.insertBefore(vid,document.body.firstChild);
-                vid.play().catch(function(){
-                    document.addEventListener('click', function retry(){
-                        document.removeEventListener('click', retry);
-                        vid.play().catch(function(){});
-                    }, {once:true});
-                });
-            });
-        }
-    }
-    insertVideo();
 
     function rgbToHsl(r,g,b){r/=255;g/=255;b/=255;var max=Math.max(r,g,b),min=Math.min(r,g,b),h,s,l=(max+min)/2;if(max===min){h=s=0;}else{var d=max-min;s=l>0.5?d/(2-max-min):d/(max+min);switch(max){case r:h=((g-b)/d+(g<b?6:0))/6;break;case g:h=((b-r)/d+2)/6;break;case b:h=((r-g)/d+4)/6;break;}}return[h*360,s*100,l*100];}
     function hslToRgb(h,s,l){h/=360;s/=100;l/=100;var r,g,b;if(s===0){r=g=b=l;}else{var q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;function hue2rgb(t){if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<0.5)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;}r=hue2rgb(h+1/3);g=hue2rgb(h);b=hue2rgb(h-1/3);}return[Math.round(r*255),Math.round(g*255),Math.round(b*255)];}
@@ -47,20 +26,16 @@
     function cr(l1,l2){var a=Math.max(l1,l2),b=Math.min(l1,l2);return(a+0.05)/(b+0.05);}
     function bestText(r,g,b){return cr(1.0,relLum(r,g,b))>=cr(0.0,relLum(r,g,b))?[255,255,255]:[0,0,0];}
     function ensureContrast(fr,fg,fb,br,bg,bb,min){min=min||4.5;var bl=relLum(br,bg,bb);if(cr(relLum(fr,fg,fb),bl)>=min)return[fr,fg,fb];var hsl=rgbToHsl(fr,fg,fb),h=hsl[0],s=hsl[1],l=hsl[2],rgb;for(var li=l;li<=98;li+=2){rgb=hslToRgb(h,s,li);if(cr(relLum(rgb[0],rgb[1],rgb[2]),bl)>=min)return rgb;}for(var ld=l;ld>=2;ld-=2){rgb=hslToRgb(h,s,ld);if(cr(relLum(rgb[0],rgb[1],rgb[2]),bl)>=min)return rgb;}return bestText(br,bg,bb);}
-    function rgb(c){return'rgb('+c[0]+','+c[1]+','+c[2]+')';}
-    function rgba(c,a){return'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')';}
+    function rgb(c){return"rgb("+c[0]+","+c[1]+","+c[2]+")";}
+    function rgba(c,a){return"rgba("+c[0]+","+c[1]+","+c[2]+","+a+")";}
     function set(k,v){document.documentElement.style.setProperty(k,v);}
-    function applyPalette(r,g,b){var hsl=rgbToHsl(r,g,b),hue=hsl[0],sat=hsl[1],lum=hsl[2];var isDark=lum<50;var sat2=Math.max(sat,50);var pL=isDark?Math.min(lum+10,25):Math.max(lum-10,75);var hL=isDark?Math.min(lum+5,18):Math.max(lum-5,82);var panelRgb=hslToRgb(hue,Math.min(sat2,45),pL);var headerRgb=hslToRgb(hue,Math.min(sat2,50),hL);var accentRgb=hslToRgb(hue,Math.max(sat2,60),isDark?70:40);var accent2=hslToRgb((hue+30)%360,Math.max(sat2,55),isDark?75:35);var accentHl=hslToRgb(hue,Math.max(sat2,50),isDark?88:25);var bgFb=hslToRgb(hue,Math.min(sat,35),isDark?8:92);var eBgR=Math.round(panelRgb[0]*0.28+bgFb[0]*0.72);var eBgG=Math.round(panelRgb[1]*0.28+bgFb[1]*0.72);var eBgB=Math.round(panelRgb[2]*0.28+bgFb[2]*0.72);var tP=ensureContrast(isDark?250:15,isDark?245:10,isDark?235:8,eBgR,eBgG,eBgB,5.0);var tS=ensureContrast(accentRgb[0],accentRgb[1],accentRgb[2],eBgR,eBgG,eBgB,4.5);var tV=ensureContrast(accent2[0],accent2[1],accent2[2],eBgR,eBgG,eBgB,4.5);var aSec=ensureContrast(accent2[0],accent2[1],accent2[2],eBgR,eBgG,eBgB,4.5);var aHl=ensureContrast(accentHl[0],accentHl[1],accentHl[2],eBgR,eBgG,eBgB,3.5);var logB=isDark?[255,250,235]:[10,6,3];var logC=bestText(logB[0],logB[1],logB[2]);var inpB=hslToRgb(hue,Math.min(sat*0.25,12),isDark?94:10);var inpC=bestText(inpB[0],inpB[1],inpB[2]);var prog=hslToRgb((hue+15)%360,Math.max(sat2,65),isDark?72:38);var svgT=ensureContrast(accentRgb[0],accentRgb[1],accentRgb[2],eBgR,eBgG,eBgB,4.5);set('--bg-fallback',rgb(bgFb));set('--panel-bg',rgba(panelRgb,0.28));set('--header-bg',rgba(headerRgb,0.60));set('--log-bg',rgb(logB));set('--bwm-bg',rgba(panelRgb,0.07));set('--tab-bg',rgba(headerRgb,0.35));set('--text-primary',rgb(tP));set('--text-secondary',rgb(tS));set('--text-value',rgb(tV));set('--log-color',rgb(logC));set('--tab-text',rgb(tP));set('--accent-primary',rgba(accentRgb,0.22));set('--accent-secondary',rgb(aSec));set('--accent-highlight',rgb(aHl));set('--link-color',rgb(tS));set('--link-hover-color',rgb(aHl));set('--btn-bg',rgba(accentRgb,0.22));set('--btn-color',rgb(tP));set('--progress-color',rgb(prog));set('--input-bg',rgba(inpB,0.85));set('--input-color',rgb(inpC));set('--input-border',rgba(accentRgb,0.25));set('--svg-text-color',rgb(svgT));set('--svg-grid-stroke',rgba(accentRgb,0.15));set('--bwm-border',rgba(accentRgb,0.18));set('--svg-bg',rgba(headerRgb,0.30));set('--tab-active-bg',rgba(accentRgb,0.20));set('--row-even',rgba(accentRgb,0.06));set('--row-odd',rgba(accentRgb,0.02));set('--scrollbar-track',rgba(accentRgb,0.05));set('--scrollbar-thumb',rgba(accentRgb,0.40));set('--scrollbar-hover',rgba(accentRgb,0.65));document.documentElement.style.backgroundColor=rgb(bgFb);}
+    function applyPalette(r,g,b){var hsl=rgbToHsl(r,g,b),hue=hsl[0],sat=hsl[1],lum=hsl[2];var isDark=lum<50;var sat2=Math.max(sat,50);var pL=isDark?Math.min(lum+10,25):Math.max(lum-10,75);var hL=isDark?Math.min(lum+5,18):Math.max(lum-5,82);var panelRgb=hslToRgb(hue,Math.min(sat2,45),pL);var headerRgb=hslToRgb(hue,Math.min(sat2,50),hL);var accentRgb=hslToRgb(hue,Math.max(sat2,60),isDark?70:40);var accent2=hslToRgb((hue+30)%360,Math.max(sat2,55),isDark?75:35);var accentHl=hslToRgb(hue,Math.max(sat2,50),isDark?88:25);var bgFb=hslToRgb(hue,Math.min(sat,35),isDark?8:92);var eBgR=Math.round(panelRgb[0]*0.28+bgFb[0]*0.72);var eBgG=Math.round(panelRgb[1]*0.28+bgFb[1]*0.72);var eBgB=Math.round(panelRgb[2]*0.28+bgFb[2]*0.72);var tP=ensureContrast(isDark?250:15,isDark?245:10,isDark?235:8,eBgR,eBgG,eBgB,5.0);var tS=ensureContrast(accentRgb[0],accentRgb[1],accentRgb[2],eBgR,eBgG,eBgB,4.5);var tV=ensureContrast(accent2[0],accent2[1],accent2[2],eBgR,eBgG,eBgB,4.5);var aSec=ensureContrast(accent2[0],accent2[1],accent2[2],eBgR,eBgG,eBgB,4.5);var aHl=ensureContrast(accentHl[0],accentHl[1],accentHl[2],eBgR,eBgG,eBgB,3.5);var logB=isDark?[255,250,235]:[10,6,3];var logC=bestText(logB[0],logB[1],logB[2]);var inpB=hslToRgb(hue,Math.min(sat*0.25,12),isDark?94:10);var inpC=bestText(inpB[0],inpB[1],inpB[2]);var prog=hslToRgb((hue+15)%360,Math.max(sat2,65),isDark?72:38);var svgT=ensureContrast(accentRgb[0],accentRgb[1],accentRgb[2],eBgR,eBgG,eBgB,4.5);set("--bg-fallback",rgb(bgFb));set("--panel-bg",rgba(panelRgb,0.28));set("--header-bg",rgba(headerRgb,0.60));set("--log-bg",rgb(logB));set("--bwm-bg",rgba(panelRgb,0.07));set("--tab-bg",rgba(headerRgb,0.35));set("--text-primary",rgb(tP));set("--text-secondary",rgb(tS));set("--text-value",rgb(tV));set("--log-color",rgb(logC));set("--tab-text",rgb(tP));set("--accent-primary",rgba(accentRgb,0.22));set("--accent-secondary",rgb(aSec));set("--accent-highlight",rgb(aHl));set("--link-color",rgb(tS));set("--link-hover-color",rgb(aHl));set("--btn-bg",rgba(accentRgb,0.22));set("--btn-color",rgb(tP));set("--progress-color",rgb(prog));set("--input-bg",rgba(inpB,0.85));set("--input-color",rgb(inpC));set("--input-border",rgba(accentRgb,0.25));set("--svg-text-color",rgb(svgT));set("--svg-grid-stroke",rgba(accentRgb,0.15));set("--bwm-border",rgba(accentRgb,0.18));set("--svg-bg",rgba(headerRgb,0.30));set("--tab-active-bg",rgba(accentRgb,0.20));set("--row-even",rgba(accentRgb,0.06));set("--row-odd",rgba(accentRgb,0.02));set("--scrollbar-track",rgba(accentRgb,0.05));set("--scrollbar-thumb",rgba(accentRgb,0.40));set("--scrollbar-hover",rgba(accentRgb,0.65));document.documentElement.style.backgroundColor=rgb(bgFb);}
 
-    // Cache palette di sessionStorage agar tidak flicker saat refresh
-    var CACHE_KEY='ft_palette_rt';
-    try{
-        var cached=sessionStorage.getItem(CACHE_KEY);
-        if(cached){var c=cached.split(',');applyPalette(parseInt(c[0]),parseInt(c[1]),parseInt(c[2]));}
-    }catch(e){}
+    var CACHE_KEY_RT="ft_palette_rt";
+    try{var cached=sessionStorage.getItem(CACHE_KEY_RT);if(cached){var c=cached.split(",");applyPalette(parseInt(c[0]),parseInt(c[1]),parseInt(c[2]));}}catch(e){}
 
-    var canvas=document.createElement('canvas');canvas.width=64;canvas.height=36;
-    var ctx=canvas.getContext('2d');
+    var canvas=document.createElement("canvas");canvas.width=64;canvas.height=36;
+    var ctx=canvas.getContext("2d");
     var lastHue=-1,lastSample=0,THROTTLE=100,HUE_THRESHOLD=5;
 
     function sample(){
@@ -75,31 +50,98 @@
             if(lastHue>=0){var diff=Math.abs(hue-lastHue);if(diff>180)diff=360-diff;if(diff<HUE_THRESHOLD)return;}
             lastHue=hue;
             applyPalette(r,g,b);
-            try{sessionStorage.setItem(CACHE_KEY,r+','+g+','+b);}catch(e){}
+            try{sessionStorage.setItem(CACHE_KEY_RT,r+","+g+","+b);}catch(e){}
         }catch(e){}
     }
 
     function loop(ts){if(ts-lastSample>=THROTTLE){lastSample=ts;sample();}requestAnimationFrame(loop);}
 
-    // Mulai loop segera saat frame tersedia, jangan tunggu playing
     function startLoop(){requestAnimationFrame(loop);}
     if(vid.readyState>=2){startLoop();}
     else{
-        vid.addEventListener('loadeddata', startLoop);
-        vid.addEventListener('canplay',    startLoop);
-        vid.addEventListener('playing',    startLoop);
+        vid.addEventListener("loadeddata",startLoop,{once:true});
+        vid.addEventListener("canplay",startLoop,{once:true});
+        vid.addEventListener("playing",startLoop,{once:true});
     }
 
-    // ── STATE ──────────────────────────────────────────────
-    var MUTE_KEY  = 'ft_bg_muted';
-    var PANEL_KEY = 'ft_panel_hidden';
-    var TRIGGER_RADIUS = 80;
-    var isMuted       = localStorage.getItem(MUTE_KEY)  === null ? true  : localStorage.getItem(MUTE_KEY)  === 'true';
-    var isPanelHidden = localStorage.getItem(PANEL_KEY) === null ? false : localStorage.getItem(PANEL_KEY) === 'true';
+    // ── AUTOPLAY + AUDIO UNLOCK ────────────────────────────
+    function unlockAndPlay(){
+        var wasUnmuted = localStorage.getItem('ft_bg_muted') === 'false';
+        vid.muted = true;
+        vid.play().catch(function(){
+            var ev=['click','touchstart','keydown'];
+            function onGesture(){
+                ev.forEach(function(e){document.removeEventListener(e,onGesture);});
+                vid.play().catch(function(){});
+            }
+            ev.forEach(function(e){document.addEventListener(e,onGesture,{once:true});});
+        });
+        if(wasUnmuted) showTapHint();
+    }
 
-    // ── STYLES ─────────────────────────────────────────────
-    var ctrlStyle = document.createElement('style');
-    ctrlStyle.textContent = [
+    function showTapHint(){
+        if(document.getElementById('ft-tap-hint')) return;
+        var hStyle=document.createElement('style');
+        hStyle.textContent=
+            '#ft-tap-hint{position:fixed;bottom:62px;right:16px;z-index:9998;'+
+            'background:rgba(15,15,15,0.7);backdrop-filter:blur(8px);'+
+            '-webkit-backdrop-filter:blur(8px);color:#fff;font-size:12px;'+
+            'padding:6px 12px;border-radius:20px;cursor:pointer;'+
+            'box-shadow:0 2px 8px rgba(0,0,0,0.4);'+
+            'display:flex;align-items:center;gap:6px;'+
+            'animation:ft-pulse 1.5s ease-in-out infinite;}'+
+            '@keyframes ft-pulse{0%,100%{opacity:0.7;}50%{opacity:1;}}';
+        document.head.appendChild(hStyle);
+        var hint=document.createElement('div');
+        hint.id='ft-tap-hint';
+        hint.innerHTML=
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+
+            '<path d="M11 5L6 9H2v6h4l5 4V5z"/>'+
+            '<path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>'+
+            '<path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>'+
+            '<span>Click to unmute</span>';
+        function removeHint(){
+            if(hint.parentNode) hint.parentNode.removeChild(hint);
+            if(hStyle.parentNode) hStyle.parentNode.removeChild(hStyle);
+        }
+        hint.addEventListener('click',function(){
+            vid.muted=false;
+            localStorage.setItem('ft_bg_muted','false');
+            // Sync icon tombol mute jika controls sudah ada
+            var btn=document.getElementById('ft-btn-mute');
+            if(btn){isMuted=false;btn.innerHTML=icons.unmuted;btn.title='Mute';}
+            removeHint();
+        });
+        function attach(){
+            document.body.appendChild(hint);
+            setTimeout(removeHint,8000);
+        }
+        if(document.body) attach();
+        else document.addEventListener('DOMContentLoaded',attach);
+    }
+
+    function insertVideo(){
+        if(document.body){
+            document.body.insertBefore(vid,document.body.firstChild);
+            unlockAndPlay();
+        } else {
+            document.addEventListener('DOMContentLoaded',function(){
+                document.body.insertBefore(vid,document.body.firstChild);
+                unlockAndPlay();
+            });
+        }
+    }
+    insertVideo();
+
+    // ── CONTROLS ───────────────────────────────────────────
+    var MUTE_KEY='ft_bg_muted';
+    var PANEL_KEY='ft_panel_hidden';
+    var TRIGGER_RADIUS=80;
+    var isMuted      =localStorage.getItem(MUTE_KEY) ===null?true :localStorage.getItem(MUTE_KEY) ==='true';
+    var isPanelHidden=localStorage.getItem(PANEL_KEY)===null?false:localStorage.getItem(PANEL_KEY)==='true';
+
+    var cStyle=document.createElement('style');
+    cStyle.textContent=[
         '#ft-controls{position:fixed;bottom:16px;right:16px;z-index:9999;display:flex;gap:8px;opacity:0;transform:translateY(6px);transition:opacity 0.25s ease,transform 0.25s ease;pointer-events:none;}',
         '#ft-controls.visible{opacity:1;transform:translateY(0);pointer-events:auto;}',
         '#ft-controls button{width:34px;height:34px;border-radius:50%;border:none;background:rgba(15,15,15,0.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:background 0.2s,transform 0.15s;box-shadow:0 2px 8px rgba(0,0,0,0.4);}',
@@ -108,59 +150,56 @@
         'body.ft-panel-hidden #container,body.ft-panel-hidden #navi,body.ft-panel-hidden #footer{opacity:0!important;pointer-events:none!important;transition:opacity 0.3s ease;}',
         'body:not(.ft-panel-hidden) #container,body:not(.ft-panel-hidden) #navi,body:not(.ft-panel-hidden) #footer{opacity:1;transition:opacity 0.3s ease;}'
     ].join('');
-    document.head.appendChild(ctrlStyle);
+    document.head.appendChild(cStyle);
 
-    // ── SVG ICONS ──────────────────────────────────────────
-    var icons = {
-        muted:   '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>',
-        unmuted: '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>',
-        hide:    '<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>',
-        show:    '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
+    var icons={
+        muted:  '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>',
+        unmuted:'<svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>',
+        hide:   '<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>',
+        show:   '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
     };
 
-    // ── CONTROLS ───────────────────────────────────────────
-    var controls = document.createElement('div');
-    controls.id = 'ft-controls';
+    var controls=document.createElement('div');
+    controls.id='ft-controls';
 
-    var btnPanel = document.createElement('button');
+    var btnPanel=document.createElement('button');
     function applyPanel(hidden){
-        isPanelHidden = hidden;
-        localStorage.setItem(PANEL_KEY, hidden ? 'true' : 'false');
-        btnPanel.innerHTML = hidden ? icons.show : icons.hide;
-        btnPanel.title     = hidden ? 'Show panels' : 'Hide panels';
-        hidden ? document.body.classList.add('ft-panel-hidden')
-               : document.body.classList.remove('ft-panel-hidden');
+        isPanelHidden=hidden;
+        localStorage.setItem(PANEL_KEY,hidden?'true':'false');
+        btnPanel.innerHTML=hidden?icons.show:icons.hide;
+        btnPanel.title=hidden?'Show panels':'Hide panels';
+        hidden?document.body.classList.add('ft-panel-hidden'):document.body.classList.remove('ft-panel-hidden');
     }
-    btnPanel.addEventListener('click', function(){ applyPanel(!isPanelHidden); });
+    btnPanel.addEventListener('click',function(){applyPanel(!isPanelHidden);});
 
-    var btnMute = document.createElement('button');
+    var btnMute=document.createElement('button');
+    btnMute.id='ft-btn-mute';
     function applyMute(muted){
-        isMuted   = muted;
-        vid.muted = muted;
-        localStorage.setItem(MUTE_KEY, muted ? 'true' : 'false');
-        btnMute.innerHTML = muted ? icons.muted : icons.unmuted;
-        btnMute.title     = muted ? 'Unmute' : 'Mute';
+        isMuted=muted; vid.muted=muted;
+        localStorage.setItem(MUTE_KEY,muted?'true':'false');
+        btnMute.innerHTML=muted?icons.muted:icons.unmuted;
+        btnMute.title=muted?'Unmute':'Mute';
+        var hint=document.getElementById('ft-tap-hint');
+        if(hint&&hint.parentNode)hint.parentNode.removeChild(hint);
     }
-    btnMute.addEventListener('click', function(){ applyMute(!isMuted); });
+    btnMute.addEventListener('click',function(){applyMute(!isMuted);});
 
     controls.appendChild(btnPanel);
     controls.appendChild(btnMute);
 
     function attachControls(){
         document.body.appendChild(controls);
-        vid.addEventListener('canplay', function(){ applyMute(isMuted); });
+        vid.addEventListener('canplay',function(){applyMute(isMuted);});
         applyMute(isMuted);
         applyPanel(isPanelHidden);
-        document.addEventListener('mousemove', function(e){
-            var rect = controls.getBoundingClientRect();
-            var cx = rect.left + rect.width/2;
-            var cy = rect.top  + rect.height/2;
-            var dist = Math.sqrt(Math.pow(e.clientX-cx,2)+Math.pow(e.clientY-cy,2));
-            dist < TRIGGER_RADIUS ? controls.classList.add('visible') : controls.classList.remove('visible');
+        document.addEventListener('mousemove',function(e){
+            var rect=controls.getBoundingClientRect();
+            var cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
+            var dist=Math.sqrt(Math.pow(e.clientX-cx,2)+Math.pow(e.clientY-cy,2));
+            dist<TRIGGER_RADIUS?controls.classList.add('visible'):controls.classList.remove('visible');
         });
     }
-
     if(document.body) attachControls();
-    else document.addEventListener('DOMContentLoaded', attachControls);
+    else document.addEventListener('DOMContentLoaded',attachControls);
 
 })();
