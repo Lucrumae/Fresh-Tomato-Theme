@@ -300,55 +300,47 @@
     }
 
     // -- REBOOT CONFIRM + REBOOT PAGE ----------------------------
-    // Approach: intercept confirm() untuk dialog custom,
-    // lalu jalankan reboot ASLI (biarkan FreshTomato handle request & navigate).
-    // Setelah navigate ke halaman reboot, inject waiting UI via initRebootUI().
+    // Dialog konfirmasi reboot. Jika user klik OK → redirect ke
+    // /reboot-wait.html yang handle reboot + video background sendiri.
 
     var _origConfirm = window.confirm;
 
-    window.confirm = function(msg) {
-        var m = (msg || '').toString().toLowerCase();
-        if(m.indexOf('reboot') === -1 && m.indexOf('restart') === -1) {
-            return _origConfirm ? _origConfirm.call(window, msg) : true;
+    window.confirm = function(msg){
+        var m = (msg||'').toString().toLowerCase();
+        if(m.indexOf('reboot')===-1 && m.indexOf('restart')===-1){
+            return _origConfirm ? _origConfirm.call(window,msg) : true;
         }
-        // Tampilkan dialog kita async, return false dulu
         setTimeout(showRebootDialog, 0);
         return false;
     };
 
-    function getAccentNow() {
-        var root = document.documentElement;
-        var acc = (getComputedStyle(root).getPropertyValue('--accent') || '').trim();
-        if(acc) return acc;
+    function getAccentNow(){
+        var a = (getComputedStyle(document.documentElement)
+                    .getPropertyValue('--accent')||'').trim();
+        if(a) return a;
         var vid = document.querySelector('video');
-        if(vid && vid.readyState >= 2) {
-            try {
-                var cv = document.createElement('canvas');
-                cv.width = 8; cv.height = 8;
-                var cx = cv.getContext('2d');
-                cx.drawImage(vid, 0, 0, 8, 8);
-                var px = cx.getImageData(0,0,8,8).data, r=0,g=0,b=0,n=0;
-                for(var i=0;i<px.length;i+=4){
-                    var br=(px[i]+px[i+1]+px[i+2])/3;
-                    if(br<20||br>235) continue;
-                    r+=px[i];g+=px[i+1];b+=px[i+2];n++;
-                }
+        if(vid && vid.readyState>=2){
+            try{
+                var cv=document.createElement('canvas');cv.width=8;cv.height=8;
+                var cx=cv.getContext('2d');cx.drawImage(vid,0,0,8,8);
+                var px=cx.getImageData(0,0,8,8).data,r=0,g=0,b=0,n=0;
+                for(var i=0;i<px.length;i+=4){var br=(px[i]+px[i+1]+px[i+2])/3;if(br<20||br>235)continue;r+=px[i];g+=px[i+1];b+=px[i+2];n++;}
                 if(n>0) return 'rgb('+~~(r/n)+','+~~(g/n)+','+~~(b/n)+')';
-            } catch(e){}
+            }catch(e){}
         }
         return '#e8a86e';
     }
 
-    function showRebootDialog() {
+    function showRebootDialog(){
         if(document.getElementById('ft-dlg')) return;
         var acc = getAccentNow();
 
         var s = document.createElement('style');
-        s.id = 'ft-dlg-style';
+        s.id = 'ft-dlg-s';
         s.textContent =
             '#ft-dlg-bd{position:fixed;inset:0;z-index:99998;' +
-                'background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);' +
-                '-webkit-backdrop-filter:blur(4px);animation:ftBdIn .2s ease;}' +
+                'background:rgba(0,0,0,.55);backdrop-filter:blur(4px);' +
+                '-webkit-backdrop-filter:blur(4px);animation:ftBdIn .2s ease}' +
             '@keyframes ftBdIn{from{opacity:0}to{opacity:1}}' +
             '#ft-dlg{position:fixed;top:50%;left:50%;' +
                 'z-index:99999;background:rgba(8,6,10,.80);' +
@@ -357,476 +349,138 @@
                 'backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);' +
                 'box-shadow:0 16px 56px rgba(0,0,0,.7);text-align:center;' +
                 'font-family:Outfit,sans-serif;' +
-                'animation:ftDlgIn .25s cubic-bezier(.22,1,.36,1) forwards;}' +
+                'animation:ftDlgIn .25s cubic-bezier(.22,1,.36,1) forwards}' +
             '@keyframes ftDlgIn{' +
-                'from{opacity:0;transform:translate(-50%,-46%) scale(.94);}' +
-                'to{opacity:1;transform:translate(-50%,-54%) scale(1);}}' +
-            '#ft-dlg.out{animation:ftDlgOut .18s ease forwards!important;}' +
+                'from{opacity:0;transform:translate(-50%,-46%) scale(.94)}' +
+                'to{opacity:1;transform:translate(-50%,-54%) scale(1)}}' +
+            '#ft-dlg.out{animation:ftDlgOut .18s ease forwards!important}' +
             '@keyframes ftDlgOut{' +
                 'to{opacity:0;transform:translate(-50%,-46%) scale(.95)}}' +
-            '#ft-dlg svg{display:block;margin:0 auto 16px;width:40px;height:40px;}' +
-            '#ft-dlg h3{font-size:17px;font-weight:700;color:#f0ece8;margin:0 0 6px;}' +
+            '#ft-dlg svg{display:block;margin:0 auto 16px;width:40px;height:40px}' +
+            '#ft-dlg h3{font-size:17px;font-weight:700;color:#f0ece8;margin:0 0 6px}' +
             '#ft-dlg p{font-size:12px;color:rgba(240,236,232,.45);' +
-                'margin:0 0 24px;line-height:1.5;}' +
-            '#ft-dlg-row{display:flex;gap:10px;}' +
+                'margin:0 0 24px;line-height:1.5}' +
+            '#ft-dlg-row{display:flex;gap:10px}' +
             '#ft-dlg-no{flex:1;padding:11px;' +
                 'border:1px solid rgba(255,255,255,.12);border-radius:10px;' +
                 'background:rgba(255,255,255,.06);color:rgba(240,236,232,.7);' +
                 'font-size:13px;font-family:Outfit,sans-serif;cursor:pointer;' +
-                'transition:opacity .15s,transform .15s;}' +
+                'transition:opacity .15s,transform .15s}' +
             '#ft-dlg-no:hover{opacity:.75;transform:translateY(-1px)}' +
             '#ft-dlg-yes{flex:1;padding:11px;border:none;border-radius:10px;' +
                 'font-size:13px;font-weight:700;font-family:Outfit,sans-serif;' +
                 'cursor:pointer;color:#0e0810;' +
-                'transition:opacity .15s,transform .15s;}' +
+                'transition:opacity .15s,transform .15s}' +
             '#ft-dlg-yes:hover{opacity:.85;transform:translateY(-1px)}';
 
-        var bd = document.createElement('div'); bd.id = 'ft-dlg-bd';
+        var bd  = document.createElement('div'); bd.id  = 'ft-dlg-bd';
         var dlg = document.createElement('div'); dlg.id = 'ft-dlg';
         dlg.innerHTML =
-            '<svg viewBox="0 0 24 24" fill="none"' +
-            ' stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"' +
+            ' stroke-linecap="round" stroke-linejoin="round">' +
             '<path d="M21 2v6h-6"/>' +
             '<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>' +
             '<path d="M3 22v-6h6"/>' +
-            '<path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>' +
-            '</svg>' +
+            '<path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>' +
             '<h3>Reboot Router?</h3>' +
             '<p>The router will restart.<br>You will be disconnected briefly.</p>' +
             '<div id="ft-dlg-row">' +
             '<button id="ft-dlg-no">Cancel</button>' +
-            '<button id="ft-dlg-yes">Reboot</button>' +
-            '</div>';
+            '<button id="ft-dlg-yes">Reboot</button></div>';
 
         document.head.appendChild(s);
         document.body.appendChild(bd);
         document.body.appendChild(dlg);
 
-        function applyAccent(c) {
-            var yes = document.getElementById('ft-dlg-yes');
-            var ico = dlg.querySelector('svg');
-            if(yes) yes.style.background = c;
-            if(ico) ico.setAttribute('stroke', c);
+        function applyAccent(col){
+            var yes=document.getElementById('ft-dlg-yes');
+            var svg=dlg.querySelector('svg');
+            if(yes) yes.style.background=col;
+            if(svg) svg.setAttribute('stroke',col);
         }
         applyAccent(acc);
 
-        // Live sync warna accent
-        var mo = new MutationObserver(function() {
-            var c = (getComputedStyle(document.documentElement)
-                         .getPropertyValue('--accent') || '').trim();
-            if(c) applyAccent(c);
+        // Live sync accent dengan adaptive
+        var mo=new MutationObserver(function(){
+            var col=(getComputedStyle(document.documentElement)
+                        .getPropertyValue('--accent')||'').trim();
+            if(col) applyAccent(col);
         });
-        mo.observe(document.documentElement, {
-            attributes: true, attributeFilter: ['style']
-        });
-        var syncT = setInterval(function() {
-            var c = (getComputedStyle(document.documentElement)
-                         .getPropertyValue('--accent') || '').trim();
-            if(c) applyAccent(c);
-        }, 200);
+        mo.observe(document.documentElement,{attributes:true,attributeFilter:['style']});
+        var syncT=setInterval(function(){
+            var col=(getComputedStyle(document.documentElement)
+                        .getPropertyValue('--accent')||'').trim();
+            if(col) applyAccent(col);
+        },200);
 
-        function close() {
+        function close(){
             mo.disconnect(); clearInterval(syncT);
             dlg.classList.add('out');
-            bd.style.transition = 'opacity .18s ease';
-            bd.style.opacity = '0';
-            setTimeout(function() {
-                [dlg, bd, s].forEach(function(el) {
+            bd.style.transition='opacity .18s ease'; bd.style.opacity='0';
+            setTimeout(function(){
+                [dlg,bd,s].forEach(function(el){
                     el.parentNode && el.parentNode.removeChild(el);
                 });
-            }, 200);
+            },200);
         }
 
-        document.getElementById('ft-dlg-yes').addEventListener('click', function() {
+        // OK → redirect ke halaman reboot custom kita
+        document.getElementById('ft-dlg-yes').addEventListener('click',function(){
             close();
-            setTimeout(function() {
-                // Tampilkan waiting UI di halaman ini DULU
-                showRebootWaiting();
-                // Lalu kirim reboot — set confirm return true agar FreshTomato tidak stuck
-                window.confirm = function(){ return true; };
-                if(typeof window.reboot === 'function') {
-                    window.reboot();
-                } else {
-                    var a = document.querySelector('a[href*="reboot"]');
-                    if(a) { a.click(); }
-                }
-                // Prevent navigation ke /tomato.cgi agar waiting UI tetap tampil
-                window.onbeforeunload = function(){ return ''; };
-                setTimeout(function(){
-                    window.onbeforeunload = null;
-                }, 500);
-                // Restore confirm intercept
-                setTimeout(function() {
-                    window.confirm = function(msg) {
-                        var m = (msg||'').toString().toLowerCase();
-                        if(m.indexOf('reboot')===-1 && m.indexOf('restart')===-1) {
-                            return _origConfirm ? _origConfirm.call(window,msg) : true;
-                        }
-                        setTimeout(showRebootDialog, 0);
-                        return false;
-                    };
-                }, 2000);
+            setTimeout(function(){
+                window.location.href = '/reboot-wait.html';
             }, 220);
         });
-        document.getElementById('ft-dlg-no').addEventListener('click', close);
-        bd.addEventListener('click', close);
+        document.getElementById('ft-dlg-no').addEventListener('click',close);
+        bd.addEventListener('click',close);
     }
 
-    // Tampilkan waiting UI dengan video background di halaman saat ini
-    function showRebootWaiting() {
-        if(document.getElementById('ft-rbv')) return;
-
-        // Sembunyikan semua konten halaman
-        document.body.style.cssText = 'margin:0;padding:0;overflow:hidden;background:#080610;';
-        var kids = document.body.children;
-        for(var i = 0; i < kids.length; i++) kids[i].style.display = 'none';
-
-        var total = 120;
-
-        // Inject styles
-        var s = document.createElement('style');
-        s.textContent =
-            '#ft-rbv{position:fixed;inset:0;width:100vw;height:100vh;' +
-            'object-fit:cover;z-index:0;pointer-events:none}' +
-            '#ft-rbo{position:fixed;inset:0;z-index:1;' +
-            'background:rgba(8,6,10,.50);transition:background 1.2s ease}' +
-            '#ft-rbw{position:fixed;inset:0;z-index:2;display:flex;' +
-            'align-items:center;justify-content:center}' +
-            '#ft-rbc{background:rgba(8,6,10,.52);' +
-            'border:1px solid rgba(255,255,255,.10);border-radius:20px;' +
-            'padding:44px 52px;backdrop-filter:blur(24px);' +
-            '-webkit-backdrop-filter:blur(24px);' +
-            'box-shadow:0 8px 48px rgba(0,0,0,.6);text-align:center;min-width:300px;' +
-            'transition:background 1.2s ease,border-color 1.2s ease;' +
-            'animation:ftCIn .5s cubic-bezier(.22,1,.36,1)}' +
-            '@keyframes ftCIn{from{opacity:0;transform:translateY(20px) scale(.97)}' +
-            'to{opacity:1;transform:translateY(0) scale(1)}}' +
-            '#ft-rbico{width:48px;height:48px;margin:0 auto 20px;display:block;' +
-            'animation:ftSp 1.8s linear infinite}' +
-            '@keyframes ftSp{to{transform:rotate(360deg)}}' +
-            '#ft-rbt{font-size:18px;font-weight:700;color:#f0ece8;' +
-            'letter-spacing:-.01em;margin-bottom:6px;font-family:Outfit,sans-serif}' +
-            '#ft-rbs{font-size:11px;color:rgba(240,236,232,.40);' +
-            'letter-spacing:.14em;text-transform:uppercase;' +
-            'font-family:"Space Mono",monospace;margin-bottom:28px}' +
-            '#ft-rbbw{width:100%;height:3px;background:rgba(255,255,255,.08);' +
-            'border-radius:4px;overflow:hidden;margin-bottom:14px}' +
-            '#ft-rbb{height:100%;width:0%;border-radius:4px;' +
-            'background:linear-gradient(90deg,var(--accent,#e8a86e),var(--accent2,#7ec8e3));' +
-            'transition:width 1s linear}' +
-            '#ft-rbcnt{font-size:12px;color:rgba(240,236,232,.45);' +
-            'font-family:Outfit,sans-serif;letter-spacing:.04em}' +
-            '#ft-rbcnt b{color:var(--accent,#e8a86e);font-size:14px}';
-        document.head.appendChild(s);
-
-        // Video
-        var vid = document.createElement('video');
-        vid.id = 'ft-rbv'; vid.autoplay = true;
-        vid.loop = true; vid.muted = true; vid.playsInline = true;
-        var src = document.createElement('source');
-        src.src = '/bgmp4.gif'; src.type = 'video/mp4';
-        vid.appendChild(src);
-
-        var ov   = document.createElement('div'); ov.id  = 'ft-rbo';
-        var wrap = document.createElement('div'); wrap.id = 'ft-rbw';
-        var card = document.createElement('div'); card.id = 'ft-rbc';
-
-        card.innerHTML =
-            '<svg id="ft-rbico" viewBox="0 0 24 24" fill="none"' +
-            ' stroke="var(--accent,#e8a86e)" stroke-width="1.5"' +
-            ' stroke-linecap="round" stroke-linejoin="round">' +
-            '<path d="M21 2v6h-6"/>' +
-            '<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>' +
-            '<path d="M3 22v-6h6"/>' +
-            '<path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>' +
-            '</svg>' +
-            '<div id="ft-rbt">Rebooting Router</div>' +
-            '<div id="ft-rbs">Please Wait</div>' +
-            '<div id="ft-rbbw"><div id="ft-rbb"></div></div>' +
-            '<div id="ft-rbcnt">Redirecting in <b id="ft-rbn">' + total + '</b>s</div>';
-
-        wrap.appendChild(card);
-        document.body.insertBefore(vid, document.body.firstChild);
-        document.body.insertBefore(ov, vid.nextSibling);
-        document.body.appendChild(wrap);
-        [vid, ov, wrap].forEach(function(el){ el.style.display = ''; });
-        vid.play().catch(function(){});
-
-        // Adaptive color dari video
-        var cv = document.createElement('canvas');
-        cv.width = 64; cv.height = 36;
-        var ctx = cv.getContext('2d'), lastHue = -1;
-
-        function H(h,s,l){h/=360;s/=100;l/=100;var q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;function f(t){t<0&&(t+=1);t>1&&(t-=1);return t<1/6?p+(q-p)*6*t:t<.5?q:t<2/3?p+(q-p)*(2/3-t)*6:p;}return[~~(f(h+1/3)*255),~~(f(h)*255),~~(f(h-1/3)*255)];}
-        function toHsl(r,g,b){r/=255;g/=255;b/=255;var mx=Math.max(r,g,b),mn=Math.min(r,g,b),h,s,l=(mx+mn)/2;if(mx===mn){h=s=0;}else{var d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?((g-b)/d+(g<b?6:0))/6:mx===g?((b-r)/d+2)/6:((r-g)/d+4)/6;}return[h*360,s*100,l*100];}
-
-        function adaptColor(){
-            if(vid.readyState<2){setTimeout(adaptColor,500);return;}
-            try{
-                ctx.drawImage(vid,0,0,64,36);
-                var px=ctx.getImageData(0,0,64,36).data,r=0,g=0,b=0,n=0;
-                for(var i=0;i<px.length;i+=4){var br=(px[i]+px[i+1]+px[i+2])/3;if(br<15||br>240)continue;r+=px[i];g+=px[i+1];b+=px[i+2];n++;}
-                if(!n)return;
-                r=~~(r/n);g=~~(g/n);b=~~(b/n);
-                var hsl=toHsl(r,g,b),hue=hsl[0],sat=hsl[1],lum=hsl[2];
-                var d=Math.abs(hue-lastHue);if(d>180)d=360-d;
-                if(lastHue<0||d>=5){
-                    lastHue=hue;
-                    var dark=lum<50,s2=Math.max(sat,50);
-                    var acc=H(hue,Math.max(s2,65),dark?68:42);
-                    var ac2=H((hue+40)%360,Math.max(s2,55),dark?72:40);
-                    var pan=H(hue,Math.min(s2,40),dark?Math.min(lum+8,20):Math.max(lum-8,80));
-                    var ovC=Math.max(pan[0]-30,0)+','+Math.max(pan[1]-30,0)+','+Math.max(pan[2]-30,0);
-                    ov.style.background='rgba('+ovC+',.50)';
-                    card.style.background='rgba('+pan[0]+','+pan[1]+','+pan[2]+',.48)';
-                    card.style.borderColor='rgba('+acc[0]+','+acc[1]+','+acc[2]+',.20)';
-                    document.documentElement.style.setProperty('--accent','rgb('+acc[0]+','+acc[1]+','+acc[2]+')');
-                    document.documentElement.style.setProperty('--accent2','rgb('+ac2[0]+','+ac2[1]+','+ac2[2]+')');
-                }
-            }catch(e){}
-            setTimeout(adaptColor,500);
-        }
-        vid.addEventListener('canplay', adaptColor, {once:true});
-
-        // Countdown + cek router online
-        var elapsed=0, bar=document.getElementById('ft-rbb'), num=document.getElementById('ft-rbn');
-        var timer=setInterval(function(){
-            elapsed++;
-            if(bar) bar.style.width=Math.min((elapsed/total)*100,100)+'%';
-            if(num) num.textContent=Math.max(total-elapsed,0);
-            if(elapsed>=total) clearInterval(timer);
-        },1000);
-
-        // Cek router online setiap 5s mulai detik ke-15
-        setTimeout(function poll(){
-            fetch('/login.html',{method:'HEAD',cache:'no-store',credentials:'omit'})
-                .then(function(r){ if(r.ok) window.location.replace('/'); })
-                .catch(function(){ setTimeout(poll,5000); });
-        }, 15000);
-    }
-
-        // Patch link reboot di DOM agar tidak trigger confirm langsung
-    // (opsional — hanya untuk link yang bypass window.reboot)
-    function patchRebootLinks() {
+    // Patch semua link/onclick reboot di DOM
+    function patchRebootLinks(){
         document.querySelectorAll('[href*="reboot"],[onclick*="reboot"]')
-            .forEach(function(el) {
-                if(el.dataset.ftPatch) return;
-                el.dataset.ftPatch = '1';
-                var oc = el.getAttribute('onclick') || '';
-                if(oc.indexOf('reboot') !== -1) {
-                    el.setAttribute('onclick', 'return false;');
-                    el.addEventListener('click', function(e) {
-                        e.preventDefault(); e.stopPropagation();
+            .forEach(function(el){
+                if(el.dataset.ftP) return; el.dataset.ftP='1';
+                var oc=el.getAttribute('onclick')||'';
+                if(oc.indexOf('reboot')!==-1){
+                    el.setAttribute('onclick','return false;');
+                    el.addEventListener('click',function(e){
+                        e.preventDefault();e.stopPropagation();
                         showRebootDialog();
                     });
                 }
-                var hr = el.getAttribute('href') || '';
-                if(hr.indexOf('reboot') !== -1) {
-                    el.setAttribute('href', 'javascript:void(0)');
-                    el.addEventListener('click', function(e) {
-                        e.preventDefault(); e.stopPropagation();
+                var hr=el.getAttribute('href')||'';
+                if(hr.indexOf('reboot')!==-1){
+                    el.setAttribute('href','javascript:void(0)');
+                    el.addEventListener('click',function(e){
+                        e.preventDefault();e.stopPropagation();
                         showRebootDialog();
                     });
                 }
             });
     }
 
-    function installPatcher() {
+    function installPatcher(){
         patchRebootLinks();
-        var pmo = new MutationObserver(function(muts) {
-            muts.forEach(function(m) {
-                m.addedNodes.forEach(function(n) {
-                    if(n.nodeType===1) {
-                        if((n.getAttribute('href')||'').indexOf('reboot')!==-1 ||
-                           (n.getAttribute('onclick')||'').indexOf('reboot')!==-1) {
-                            n.dataset.ftPatch = '';
-                            patchRebootLinks();
+        var pmo=new MutationObserver(function(muts){
+            muts.forEach(function(m){
+                m.addedNodes.forEach(function(n){
+                    if(n.nodeType===1){
+                        if((n.getAttribute('href')||'').indexOf('reboot')!==-1||
+                           (n.getAttribute('onclick')||'').indexOf('reboot')!==-1){
+                            n.dataset.ftP=''; patchRebootLinks();
                         }
-                        n.querySelectorAll && n.querySelectorAll(
+                        n.querySelectorAll&&n.querySelectorAll(
                             '[href*="reboot"],[onclick*="reboot"]'
-                        ).forEach(function(c){ c.dataset.ftPatch=''; patchRebootLinks(); });
+                        ).forEach(function(c){c.dataset.ftP='';patchRebootLinks();});
                     }
                 });
             });
         });
         pmo.observe(document.body||document.documentElement,
-            {childList:true, subtree:true});
+            {childList:true,subtree:true});
     }
     if(document.body) installPatcher();
-    else document.addEventListener('DOMContentLoaded', installPatcher);
-
-    // --- REBOOT WAITING PAGE ---
-    // Deteksi halaman reboot: cek URL /tomato.cgi DAN body mengandung teks reboot
-    function initRebootUI() {
-        // Cek URL dulu - halaman reboot selalu di /tomato.cgi
-        var isRebootUrl = window.location.pathname.indexOf('tomato.cgi') !== -1 ||
-                          window.location.pathname.indexOf('reboot') !== -1;
-        if(!isRebootUrl) return;
-
-        // Cek apakah body mengandung teks reboot (case-insensitive)
-        var bodyText = (document.body && document.body.innerText || '').toLowerCase();
-        var found = bodyText.indexOf('please wait') !== -1 ||
-                    bodyText.indexOf('reboots') !== -1 ||
-                    bodyText.indexOf('reboot') !== -1;
-        if(!found) return;
-
-        // Pastikan belum pernah inject
-        if(document.getElementById('ft-rb-video')) return;
-
-        document.body.style.cssText =
-            'margin:0;padding:0;overflow:hidden;background:#080610;';
-        for(var c=0; c<document.body.children.length; c++) {
-            document.body.children[c].style.display = 'none';
-        }
-
-        var s = document.createElement('style');
-        s.textContent =
-            '#ft-rb-video{position:fixed;inset:0;width:100vw;height:100vh;' +
-            'object-fit:cover;z-index:0;pointer-events:none;}' +
-            '#ft-rb-overlay{position:fixed;inset:0;z-index:1;' +
-            'background:rgba(8,6,10,.50);transition:background 1.2s ease;}' +
-            '#ft-rb-wrap{position:fixed;inset:0;z-index:2;display:flex;' +
-            'align-items:center;justify-content:center;}' +
-            '#ft-rb-card{background:rgba(8,6,10,.52);' +
-            'border:1px solid rgba(255,255,255,.10);border-radius:20px;' +
-            'padding:44px 52px;backdrop-filter:blur(24px);' +
-            '-webkit-backdrop-filter:blur(24px);' +
-            'box-shadow:0 8px 48px rgba(0,0,0,.6);text-align:center;' +
-            'min-width:300px;transition:background 1.2s ease,border-color 1.2s ease;' +
-            'animation:ftCardIn .5s cubic-bezier(.22,1,.36,1);}' +
-            '@keyframes ftCardIn{' +
-            'from{opacity:0;transform:translateY(20px) scale(.97);}' +
-            'to{opacity:1;transform:translateY(0) scale(1);}}' +
-            '#ft-rb-icon{width:48px;height:48px;margin:0 auto 20px;display:block;' +
-            'animation:ftRbSpin 1.8s linear infinite;}' +
-            '@keyframes ftRbSpin{to{transform:rotate(360deg)}}' +
-            '#ft-rb-title{font-size:18px;font-weight:700;color:#f0ece8;' +
-            'letter-spacing:-.01em;margin-bottom:6px;font-family:Outfit,sans-serif;}' +
-            '#ft-rb-sub{font-size:11px;color:rgba(240,236,232,.40);' +
-            'letter-spacing:.14em;text-transform:uppercase;' +
-            'font-family:"Space Mono",monospace;margin-bottom:28px;}' +
-            '#ft-rb-bar-wrap{width:100%;height:3px;' +
-            'background:rgba(255,255,255,.08);border-radius:4px;' +
-            'overflow:hidden;margin-bottom:14px;}' +
-            '#ft-rb-bar{height:100%;width:0%;border-radius:4px;' +
-            'background:linear-gradient(90deg,' +
-            'var(--accent,#e8a86e),var(--accent2,#7ec8e3));' +
-            'transition:width 1s linear;}' +
-            '#ft-rb-count{font-size:12px;color:rgba(240,236,232,.45);' +
-            'font-family:Outfit,sans-serif;letter-spacing:.04em;}' +
-            '#ft-rb-count b{color:var(--accent,#e8a86e);font-size:14px;}';
-        document.head.appendChild(s);
-
-        var vid = document.createElement('video');
-        vid.id='ft-rb-video'; vid.autoplay=true;
-        vid.loop=true; vid.muted=true; vid.playsInline=true;
-        var src = document.createElement('source');
-        src.src='/bgmp4.gif'; src.type='video/mp4';
-        vid.appendChild(src);
-
-        var overlay = document.createElement('div'); overlay.id='ft-rb-overlay';
-        var wrap    = document.createElement('div'); wrap.id='ft-rb-wrap';
-
-        // Ambil countdown dari halaman asli FreshTomato
-        var total = 120;
-        var countEl = document.querySelector('input[type=text],#count,#countdown');
-        if(countEl) {
-            var v = parseInt(countEl.value || countEl.textContent);
-            if(v>0 && v<300) total=v;
-        }
-
-        var card = document.createElement('div'); card.id='ft-rb-card';
-        card.innerHTML =
-            '<svg id="ft-rb-icon" viewBox="0 0 24 24" fill="none"' +
-            ' stroke="var(--accent,#e8a86e)" stroke-width="1.5"' +
-            ' stroke-linecap="round" stroke-linejoin="round">' +
-            '<path d="M21 2v6h-6"/>' +
-            '<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>' +
-            '<path d="M3 22v-6h6"/>' +
-            '<path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>' +
-            '</svg>' +
-            '<div id="ft-rb-title">Rebooting Router</div>' +
-            '<div id="ft-rb-sub">Please Wait</div>' +
-            '<div id="ft-rb-bar-wrap"><div id="ft-rb-bar"></div></div>' +
-            '<div id="ft-rb-count">Redirecting in ' +
-            '<b id="ft-rb-num">'+total+'</b>s</div>';
-
-        wrap.appendChild(card);
-        document.body.insertBefore(vid, document.body.firstChild);
-        document.body.insertBefore(overlay, vid.nextSibling);
-        document.body.appendChild(wrap);
-        [vid,overlay,wrap].forEach(function(el){ el.style.display=''; });
-        vid.play().catch(function(){});
-
-        // Adaptive color
-        var cv=document.createElement('canvas'); cv.width=64; cv.height=36;
-        var ctx=cv.getContext('2d'); var lastHue=-1;
-        function H(h,s,l){h/=360;s/=100;l/=100;var q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;function f(t){t<0&&(t+=1);t>1&&(t-=1);return t<1/6?p+(q-p)*6*t:t<.5?q:t<2/3?p+(q-p)*(2/3-t)*6:p;}return[~~(f(h+1/3)*255),~~(f(h)*255),~~(f(h-1/3)*255)];}
-        function toHsl(r,g,b){r/=255;g/=255;b/=255;var mx=Math.max(r,g,b),mn=Math.min(r,g,b),h,s,l=(mx+mn)/2;if(mx===mn){h=s=0;}else{var d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?((g-b)/d+(g<b?6:0))/6:mx===g?((b-r)/d+2)/6:((r-g)/d+4)/6;}return[h*360,s*100,l*100];}
-        function adaptColor(){
-            if(vid.readyState<2){setTimeout(adaptColor,500);return;}
-            try{
-                ctx.drawImage(vid,0,0,64,36);
-                var px=ctx.getImageData(0,0,64,36).data,r=0,g=0,b=0,n=0;
-                for(var i=0;i<px.length;i+=4){var br=(px[i]+px[i+1]+px[i+2])/3;if(br<15||br>240)continue;r+=px[i];g+=px[i+1];b+=px[i+2];n++;}
-                if(!n)return;
-                r=~~(r/n);g=~~(g/n);b=~~(b/n);
-                var hsl=toHsl(r,g,b),hue=hsl[0],sat=hsl[1],lum=hsl[2];
-                var d=Math.abs(hue-lastHue);if(d>180)d=360-d;
-                if(lastHue<0||d>=5){
-                    lastHue=hue;
-                    var dark=lum<50,s2=Math.max(sat,50);
-                    var acc=H(hue,Math.max(s2,65),dark?68:42);
-                    var ac2=H((hue+40)%360,Math.max(s2,55),dark?72:40);
-                    var pan=H(hue,Math.min(s2,40),dark?Math.min(lum+8,20):Math.max(lum-8,80));
-                    var ov=Math.max(pan[0]-30,0)+','+Math.max(pan[1]-30,0)+','+Math.max(pan[2]-30,0);
-                    overlay.style.background='rgba('+ov+',.50)';
-                    card.style.background='rgba('+pan[0]+','+pan[1]+','+pan[2]+',.48)';
-                    card.style.borderColor='rgba('+acc[0]+','+acc[1]+','+acc[2]+',.20)';
-                    document.documentElement.style.setProperty('--accent','rgb('+acc[0]+','+acc[1]+','+acc[2]+')');
-                    document.documentElement.style.setProperty('--accent2','rgb('+ac2[0]+','+ac2[1]+','+ac2[2]+')');
-                }
-            }catch(e){}
-            setTimeout(adaptColor,500);
-        }
-        vid.addEventListener('canplay',adaptColor,{once:true});
-
-        // Countdown — ikuti countdown asli dari halaman FreshTomato jika ada
-        var elapsed=0,bar=document.getElementById('ft-rb-bar'),num=document.getElementById('ft-rb-num');
-        var timer=setInterval(function(){
-            // Sync dengan countdown asli jika masih ada
-            if(countEl){ var v=parseInt(countEl.value||countEl.textContent); if(v>0&&v<300){total=v+elapsed;} }
-            elapsed++;
-            if(bar) bar.style.width=Math.min((elapsed/total)*100,100)+'%';
-            if(num) num.textContent=Math.max(total-elapsed,0);
-            if(elapsed>=total) clearInterval(timer);
-        },1000);
-    }
-
-    // Jalankan initRebootUI — poll beberapa kali untuk catch semua timing
-    function tryRebootUI() {
-        // Cek URL sekarang sebelum apapun
-        var path = window.location.pathname;
-        var isRebootPage = path.indexOf('tomato.cgi') !== -1 ||
-                           path.indexOf('reboot') !== -1;
-        if(!isRebootPage) return;
-
-        // Poll sampai body siap dan konten ter-render
-        var attempts = 0;
-        function attempt() {
-            if(document.getElementById('ft-rb-video')) return; // sudah inject
-            initRebootUI();
-            attempts++;
-            if(attempts < 10) setTimeout(attempt, 300);
-        }
-
-        if(document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', attempt);
-        } else {
-            attempt();
-        }
-    }
-    tryRebootUI();
+    else document.addEventListener('DOMContentLoaded',installPatcher);
 
 
 
