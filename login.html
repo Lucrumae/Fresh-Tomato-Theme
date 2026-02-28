@@ -15,6 +15,8 @@
     document.cookie='ft_auth=; Path=/; Max-Age=0; SameSite=Lax';
     history.replaceState(null,'','/login.html');
   } else if(getCookie('ft_auth')){
+    // Reset session flag agar popup unmute bisa muncul di halaman router
+    sessionStorage.removeItem('ft_session_unmuted');
     window.location.replace('/index.asp');
   }
 })();
@@ -222,6 +224,8 @@
       if(r.ok){
         // Set cookie ft_auth — nginx pakai ini untuk cek session di GET /
         document.cookie='ft_auth='+encodeURIComponent(creds)+'; Path=/; SameSite=Lax';
+        // Reset session flag agar popup unmute bisa muncul lagi di halaman router
+        sessionStorage.removeItem('ft_session_unmuted');
         window.location.replace('/index.asp');
       } else {
         btn.classList.remove('loading');
