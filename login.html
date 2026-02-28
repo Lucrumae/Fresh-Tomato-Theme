@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FreshTomato — Login</title>
+<title>FreshTomato - Login</title>
 <script>
 (function(){
   function getCookie(n){
@@ -171,7 +171,7 @@
 
   var isMuted = localStorage.getItem(MUTE_KEY) !== 'false';
 
-  // ── ADAPTIVE COLOR ────────────────────────────────────────
+  // -- ADAPTIVE COLOR ----------------------------------------
   var vid=document.getElementById('bg-video');
   var overlay=document.getElementById('bg-overlay');
   var card=document.getElementById('card');
@@ -184,18 +184,18 @@
   function toHsl(r,g,b){r/=255;g/=255;b/=255;var mx=Math.max(r,g,b),mn=Math.min(r,g,b),h,s,l=(mx+mn)/2;if(mx===mn){h=s=0;}else{var d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?((g-b)/d+(g<b?6:0))/6:mx===g?((b-r)/d+2)/6:((r-g)/d+4)/6;}return[h*360,s*100,l*100];}
 
   function adaptLoop(ts){
-    if(ts-lastTs>120){lastTs=ts;if(vid.readyState>=2){try{ctx.drawImage(vid,0,0,64,36);var px=ctx.getImageData(0,0,64,36).data,r=0,g=0,b=0,n=0;for(var i=0;i<px.length;i+=4){var br=(px[i]+px[i+1]+px[i+2])/3;if(br<15||br>240)continue;r+=px[i];g+=px[i+1];b+=px[i+2];n++;}if(n){r=~~(r/n);g=~~(g/n);b=~~(b/n);var hsl=toHsl(r,g,b),hue=hsl[0],sat=hsl[1],lum=hsl[2];var d=Math.abs(hue-lastHue);if(d>180)d=360-d;if(lastHue<0||d>=5){lastHue=hue;var dark=lum<50,s2=Math.max(sat,50);var acc=H(hue,Math.max(s2,65),dark?68:42);var acc2=H((hue+40)%360,Math.max(s2,55),dark?72:40);var pan=H(hue,Math.min(s2,40),dark?Math.min(lum+8,20):Math.max(lum-8,80));var ov=Math.max(pan[0]-30,0)+','+Math.max(pan[1]-30,0)+','+Math.max(pan[2]-30,0);overlay.style.background='rgba('+ov+',0.42)';card.style.background='rgba('+pan[0]+','+pan[1]+','+pan[2]+',0.36)';card.style.borderColor='rgba('+acc[0]+','+acc[1]+','+acc[2]+',0.20)';document.documentElement.style.setProperty('--accent','rgb('+acc[0]+','+acc[1]+','+acc[2]+')');document.documentElement.style.setProperty('--accent2','rgb('+acc2[0]+','+acc2[1]+','+acc2[2]+')');document.documentElement.style.setProperty('--panel-edge','rgba('+acc[0]+','+acc[1]+','+acc[2]+',0.20)');document.body.style.background='rgb('+Math.max(pan[0]-45,0)+','+Math.max(pan[1]-45,0)+','+Math.max(pan[2]-45,0)+')';}}}catch(e){}}}}
+    if(ts-lastTs>120){lastTs=ts;if(vid.readyState>=2){try{ctx.drawImage(vid,0,0,64,36);var px=ctx.getImageData(0,0,64,36).data,r=0,g=0,b=0,n=0;for(var i=0;i<px.length;i+=4){var br=(px[i]+px[i+1]+px[i+2])/3;if(br<15||br>240)continue;r+=px[i];g+=px[i+1];b+=px[i+2];n++;}if(n){r=~~(r/n);g=~~(g/n);b=~~(b/n);var hsl=toHsl(r,g,b),hue=hsl[0],sat=hsl[1],lum=hsl[2];var d=Math.abs(hue-lastHue);if(d>180)d=360-d;if(lastHue<0||d>=5){lastHue=hue;var dark=lum<50,s2=Math.max(sat,50);var acc=H(hue,Math.max(s2,65),dark?68:42);var acc2=H((hue+40)%360,Math.max(s2,55),dark?72:40);var pan=H(hue,Math.min(s2,40),dark?Math.min(lum+8,20):Math.max(lum-8,80));var ov=Math.max(pan[0]-30,0)+','+Math.max(pan[1]-30,0)+','+Math.max(pan[2]-30,0);overlay.style.background='rgba('+ov+',0.42)';card.style.background='rgba('+pan[0]+','+pan[1]+','+pan[2]+',0.36)';card.style.borderColor='rgba('+acc[0]+','+acc[1]+','+acc[2]+',0.20)';document.documentElement.style.setProperty('--accent','rgb('+acc[0]+','+acc[1]+','+acc[2]+')');document.documentElement.style.setProperty('--accent2','rgb('+acc2[0]+','+acc2[1]+','+acc2[2]+')');document.documentElement.style.setProperty('--panel-edge','rgba('+acc[0]+','+acc[1]+','+acc[2]+',0.20)');document.body.style.background='rgb('+Math.max(pan[0]-45,0)+','+Math.max(pan[1]-45,0)+','+Math.max(pan[2]-45,0)+')';}}}catch(e){}}}
     requestAnimationFrame(adaptLoop);
   }
   vid.muted=true;
   vid.play().catch(function(){});
   requestAnimationFrame(adaptLoop);
 
-  // ── ICONS ─────────────────────────────────────────────────
+  // -- ICONS -------------------------------------------------
   var ICO_MUTED   = '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>';
   var ICO_UNMUTED = '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
 
-  // ── CONTROLS ──────────────────────────────────────────────
+  // -- CONTROLS ----------------------------------------------
   var controls = document.createElement('div');
   controls.id = 'ft-controls';
 
@@ -227,7 +227,7 @@
     dist < 80 ? controls.classList.add('visible') : controls.classList.remove('visible');
   });
 
-  // ── TOOLTIP HELPER ────────────────────────────────────────
+  // -- TOOLTIP HELPER ----------------------------------------
   function dismissTip(tip, delay){
     delay = delay || 0;
     setTimeout(function(){
@@ -239,7 +239,7 @@
     }, delay);
   }
 
-  // ── ONBOARDING TIP: MUTE ──────────────────────────────────
+  // -- ONBOARDING TIP: MUTE ----------------------------------
   // Muncul sekali saat pertama install (belum pernah unmute)
   setTimeout(function(){
     if(localStorage.getItem(TIP_MUTE)) return;
@@ -248,7 +248,7 @@
     var tip = document.createElement('div');
     tip.id = 'ft-tip-mute';
     tip.className = 'ft-tip tip-bottom-right';
-    tip.innerHTML = '🔇 Background is muted.<br><b>Click here or the button</b><br>in the corner to unmute.';
+    tip.innerHTML = '[mute] Background is muted.<br><b>Click here or the button</b><br>in the corner to unmute.';
     tip.style.pointerEvents = 'auto';
     tip.style.cursor = 'pointer';
     tip.addEventListener('click', function(){ applyMute(false); });
@@ -266,7 +266,7 @@
     }, 8000);
   }, 1500);
 
-  // ── UNMUTE POPUP (refresh saat audio ON) ──────────────────
+  // -- UNMUTE POPUP (refresh saat audio ON) ------------------
   if(localStorage.getItem(MUTE_KEY) === 'false'){
     setTimeout(function(){
       var p = document.createElement('div');
@@ -284,7 +284,7 @@
     }, 700);
   }
 
-  // ── EYE BUTTON ────────────────────────────────────────────
+  // -- EYE BUTTON --------------------------------------------
   var pwdEl  = document.getElementById('password');
   var eyeBtn = document.getElementById('eye-btn');
   var eyeSvg = document.getElementById('eye-svg');
@@ -296,7 +296,7 @@
     eyeSvg.innerHTML = show ? CLOSED : OPEN;
   });
 
-  // ── FORM SUBMIT ───────────────────────────────────────────
+  // -- FORM SUBMIT -------------------------------------------
   var stage = document.getElementById('stage');
   var form  = document.getElementById('form');
   var btn   = document.getElementById('btn');
@@ -331,7 +331,7 @@
       if(r.ok){
         document.cookie = 'ft_auth=' + encodeURIComponent(creds) + '; Path=/; SameSite=Lax';
         sessionStorage.removeItem('ft_session_unmuted');
-        // Flag untuk trigger tip "hide panel" di router — hanya pertama kali login
+        // Flag untuk trigger tip "hide panel" di router - hanya pertama kali login
         if(!localStorage.getItem(FIRST_LOGIN)){
           localStorage.setItem(FIRST_LOGIN, '1');
           sessionStorage.setItem('ft_show_panel_tip', '1');
