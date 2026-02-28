@@ -7,6 +7,8 @@
 
 INSTALL_PATH="/jffs/mywww"
 NGINX_PATH="/jffs/nginx"
+LAN_IP=$(nvram get lan_ipaddr 2>/dev/null)
+[ -z "$LAN_IP" ] && LAN_IP="192.168.1.1"
 
 # ANSI Colors
 BGREEN='\033[1;32m'; RED='\033[0;31m'; YELLOW='\033[1;33m'
@@ -69,7 +71,7 @@ divider; echo ""
 # =================================================================
 # STEP 1: STOP NGINX
 # =================================================================
-echo -ne "  ${CYAN}[1/8]${NC}  Stopping nginx...                       "
+echo -ne "  ${CYAN}[1/7]${NC}  Stopping nginx...                       "
 pkill -9 nginx 2>/dev/null
 kill -9 $(cat /tmp/nginx.pid 2>/dev/null) 2>/dev/null
 rm -f /tmp/nginx.pid 2>/dev/null
@@ -79,7 +81,7 @@ echo -e "${BGREEN}done${NC}"
 # =================================================================
 # STEP 2: UNMOUNT /www
 # =================================================================
-echo -ne "  ${CYAN}[2/8]${NC}  Restoring /www mount...                 "
+echo -ne "  ${CYAN}[2/7]${NC}  Restoring /www mount...                 "
 umount -l /www 2>/dev/null
 sleep 1
 # Verifikasi /www kembali ke original (bukan dari /jffs/mywww)
@@ -91,7 +93,7 @@ echo -e "${BGREEN}done${NC}"
 # =================================================================
 # STEP 3: RESTORE HTTPD TO PORT 80
 # =================================================================
-echo -ne "  ${CYAN}[3/8]${NC}  Setting httpd back to port 80...        "
+echo -ne "  ${CYAN}[3/7]${NC}  Setting httpd back to port 80...        "
 nvram set http_lanport=80
 nvram commit >/dev/null 2>&1
 echo -e "${BGREEN}done${NC}"
@@ -99,7 +101,7 @@ echo -e "${BGREEN}done${NC}"
 # =================================================================
 # STEP 4: REMOVE BOOT HOOK FROM script_init
 # =================================================================
-echo -ne "  ${CYAN}[4/8]${NC}  Removing boot hook from script_init...  "
+echo -ne "  ${CYAN}[4/7]${NC}  Removing boot hook from script_init...  "
 CURRENT=$(nvram get script_init 2>/dev/null)
 if [ -n "$CURRENT" ]; then
     # Hapus blok theme (support kedua format marker)
@@ -125,7 +127,7 @@ echo -e "${BGREEN}done${NC}"
 # =================================================================
 # STEP 5: RESTORE SSH
 # =================================================================
-echo -ne "  ${CYAN}[5/8]${NC}  Restoring SSH configuration...          "
+echo -ne "  ${CYAN}[5/7]${NC}  Restoring SSH configuration...          "
 
 # Baca custom user dari .passwd jika ada
 CUSTOM_USER=""
@@ -156,25 +158,16 @@ echo -e "${BGREEN}done${NC}"
 # =================================================================
 # STEP 6: REMOVE THEME FILES
 # =================================================================
-echo -ne "  ${CYAN}[6/8]${NC}  Removing theme files...                 "
+echo -ne "  ${CYAN}[6/7]${NC}  Removing theme files...                 "
 rm -rf "$INSTALL_PATH" 2>/dev/null
 rm -rf "$NGINX_PATH" 2>/dev/null
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
-# STEP 7: RESTART SSH SERVICE
+# STEP 7: APPLY CREDENTIALS + RESTART HTTPD
 # =================================================================
-echo -ne "  ${CYAN}[7/8]${NC}  Restarting SSH service...               "
-service sshd restart >/dev/null 2>&1
-sleep 1
-echo -e "${BGREEN}done${NC}"
-
-# =================================================================
-# STEP 8: RESET CREDENTIALS + RESTART HTTPD
-# =================================================================
-echo -ne "  ${CYAN}[8/8]${NC}  Applying credentials...                 "
+echo -ne "  ${CYAN}[7/7]${NC}  Applying credentials & restarting httpd...  "
 if [ "$RESET_CREDS" = "1" ]; then
-    # Reset ke default root/admin
     nvram set http_username="root"
     nvram set http_passwd="admin"
     nvram commit >/dev/null 2>&1
@@ -187,6 +180,8 @@ if [ "$RESET_CREDS" = "1" ]; then
         rm -f /tmp/shadow.tmp
     fi
 fi
+service httpd restart >/dev/null 2>&1
+sleep 1
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
@@ -199,7 +194,7 @@ echo -e "  ${BGREEN}✔  Uninstall complete!${NC}"; echo ""
 echo -e "  ${WHITE}Restored:${NC}"
 echo -e "  ${DIM}  • nginx stopped and removed${NC}"
 echo -e "  ${DIM}  • /www restored to original${NC}"
-echo -e "  ${DIM}  • httpd set to port 80${NC}"
+echo -e "  ${DIM}  • httpd running on port 80${NC}"
 echo -e "  ${DIM}  • boot hook removed from script_init${NC}"
 echo -e "  ${DIM}  • root SSH login restored${NC}"
 [ -n "$CUSTOM_USER" ] && \
@@ -210,7 +205,6 @@ else
     echo -e "  ${DIM}  • credentials unchanged${NC}"
 fi
 echo ""
-
 warn "Clear browser cache (Ctrl+F5) to see original router UI."
 echo ""
 echo -e "  ${DIM}To reinstall the theme, run:${NC}"
@@ -218,23 +212,17 @@ echo -e "  ${CYAN}  wget -O - https://raw.githubusercontent.com/Lucrumae/Fresh-T
 echo ""; divider; echo ""
 
 # =================================================================
-# HTTPD RESTART — di paling akhir setelah semua output selesai
+# SSHD RESTART — hanya jika credentials di-reset, di paling akhir
 # =================================================================
-echo -e "  ${YELLOW}⚠  httpd Service Restart${NC}"
-divider
 if [ "$RESET_CREDS" = "1" ]; then
-    echo -e "  ${DIM}Credentials have been reset. The web server must${NC}"
-    echo -e "  ${DIM}restart to apply changes — you will be logged out.${NC}"
+    echo -e "  ${YELLOW}⚠  SSH Service Restart${NC}"
+    divider
+    echo -e "  ${DIM}SSH credentials have been reset. The SSH daemon${NC}"
+    echo -e "  ${DIM}must restart — your current session will disconnect.${NC}"
     echo ""
-    echo -e "  ${WHITE}Login with new credentials:${NC}"
-    echo -e "  ${CYAN}  Username  root${NC}"
-    echo -e "  ${CYAN}  Password  admin${NC}"
-else
-    echo -e "  ${DIM}The web server must restart to finalize the uninstall.${NC}"
-    echo -e "  ${DIM}You will be logged out briefly.${NC}"
-    echo ""
-    echo -e "  ${WHITE}Login with your existing credentials.${NC}"
+    echo -e "  ${WHITE}Reconnect using:${NC}"
+    echo -e "  ${CYAN}  ssh root@${LAN_IP}${NC}"
+    echo ""; divider; echo ""
+    sleep 3
+    service sshd restart >/dev/null 2>&1
 fi
-echo ""; divider; echo ""
-sleep 3
-service httpd restart >/dev/null 2>&1
