@@ -791,12 +791,29 @@ SAFE_SCRIPT=$SAFE_SCRIPT
 BOOTEOF2
 
     cat >> "$NGINX_PATH/boot.sh" << 'BOOTEOF3'
+# =================================================================
+# BOOT RESTORE — dijalankan setiap router restart via script_init
+# Semua perubahan di /etc, /www bersifat tmpfs — hilang setiap reboot
+# File permanen tersimpan di /jffs dan di-restore di sini
+# =================================================================
+
+# 1. MOUNT: bind /jffs/mywww → /www agar theme aktif
 [ -d "$SAFE_PATH" ] || exit 0
 mount | grep -q "$SAFE_PATH" || mount --bind "$SAFE_PATH" /www
-grep -q "$SAFE_SCRIPT" "$SAFE_PATH/tomato.js" 2>/dev/null ||     echo "document.addEventListener("DOMContentLoaded",function(){var s=document.createElement("script");s.src="/$SAFE_SCRIPT";document.head.appendChild(s);});" >> "$SAFE_PATH/tomato.js"
+
+# 2. THEME SCRIPT: pastikan video/adaptive script ter-inject ke tomato.js
+if [ -f "$SAFE_PATH/tomato.js" ] && [ -n "$SAFE_SCRIPT" ]; then
+    grep -q "$SAFE_SCRIPT" "$SAFE_PATH/tomato.js" 2>/dev/null || \
+        printf 'document.addEventListener("DOMContentLoaded",function(){var s=document.createElement("script");s.src="/%s";document.head.appendChild(s);});\n' \
+        "$SAFE_SCRIPT" >> "$SAFE_PATH/tomato.js"
+fi
+
+# 3. HTTPD: jalankan di port 8008, nginx yang handle port 80
 nvram set http_lanport=8008
 service httpd restart
 sleep 2
+
+# 4. NGINX: start ulang dengan config dari JFFS
 mkdir -p /var/log/nginx /var/lib/nginx/client /var/lib/nginx/proxy
 PORT80_PID=$(netstat -tlnp 2>/dev/null | grep ':80 ' | awk '{print $7}' | cut -d/ -f1 | head -1)
 [ -n "$PORT80_PID" ] && kill -9 "$PORT80_PID" 2>/dev/null && sleep 1
@@ -805,65 +822,110 @@ kill -9 $(cat /tmp/nginx.pid 2>/dev/null) 2>/dev/null
 rm -f /tmp/nginx.pid 2>/dev/null
 sleep 2
 nginx -c "$SAFE_NGINX/nginx.conf"
-# Re-apply SSH credentials on boot
+
+# 5. LOGIN PAGE: pastikan login.html tersedia di nginx/static
+# (file di JFFS permanen, tapi nginx/static bisa kosong jika tmpfs)
+[ -f "$SAFE_PATH/login.html" ] && \
+    cp "$SAFE_PATH/login.html" "$SAFE_NGINX/static/login.html" 2>/dev/null
+
+# 6. SSH CREDENTIALS: /etc/passwd + /etc/shadow di-reset tiap boot dari tmpfs
+#    restore dari .passwd yang tersimpan permanen di /jffs/mywww
 _F="$SAFE_PATH/.passwd"
 _U=$(cut -d: -f1 "$_F" 2>/dev/null)
 _P=$(cut -d: -f2- "$_F" 2>/dev/null)
+
 if [ -n "$_P" ]; then
-    # Generate hash dan tulis ke shadow (passwd command tidak ada di FreshTomato)
     _H=$(openssl passwd -1 "$_P" 2>/dev/null)
     if [ -n "$_H" ]; then
+        # Restore password root
         grep -v "^root:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
         echo "root:${_H}:18000:0:99999:7:::" >> /tmp/shadow.tmp
         cp /tmp/shadow.tmp /etc/shadow
-    fi
-    if [ -n "$_U" ] && [ "$_U" != "root" ]; then
-        # Re-create custom user
-        grep -v "^${_U}:" /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
-        echo "${_U}:x:0:0::/root:/bin/sh" >> /etc/passwd
-        # Set password di shadow
-        _UH=$(openssl passwd -1 "$_P" 2>/dev/null)
-        if [ -n "$_UH" ]; then
+
+        if [ -n "$_U" ] && [ "$_U" != "root" ]; then
+            # Re-create custom user UID 0 di /etc/passwd
+            grep -v "^${_U}:" /etc/passwd > /tmp/passwd.tmp 2>/dev/null || cp /etc/passwd /tmp/passwd.tmp
+            echo "${_U}:x:0:0::/root:/bin/sh" >> /tmp/passwd.tmp
+            cp /tmp/passwd.tmp /etc/passwd
+
+            # Set password custom user di shadow
             grep -v "^${_U}:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
-            echo "${_U}:${_UH}:18000:0:99999:7:::" >> /tmp/shadow.tmp
+            echo "${_U}:${_H}:18000:0:99999:7:::" >> /tmp/shadow.tmp
             cp /tmp/shadow.tmp /etc/shadow
+
+            # Block root SSH: shell → /bin/false
+            awk 'BEGIN{FS=OFS=":"} /^root:/{$7="/bin/false"} {print}' \
+                /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
         fi
-        # Block root SSH
-        awk 'BEGIN{FS=OFS=":"} /^root:/{$7="/bin/false"} {print}' /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
     fi
 fi
+
+# 7. SSH SERVICE: enable + restart agar semua credential di atas aktif
+nvram set sshd_enable=1
+nvram set sshd_pass=1
+service sshd restart >/dev/null 2>&1
 BOOTEOF3
     chmod 755 "$NGINX_PATH/boot.sh"
-
-    BOOT_HOOK="# --- Theme Startup ---
-sleep 10
-sh $SAFE_NGINX/boot.sh
-# --- End Theme Startup ---"
 
     LOGIN_STATUS="${BGREEN}Custom login page (nginx)${NC}"
 
 else
-    # Fallback tanpa nginx
+    # Fallback tanpa nginx — buat boot.sh minimal
+    mkdir -p "$NGINX_PATH"
+    cat > "$NGINX_PATH/boot.sh" << FALLBACKEOF
+#!/bin/sh
+SAFE_PATH=$SAFE_PATH
+SAFE_SCRIPT=$SAFE_SCRIPT
+[ -d "\$SAFE_PATH" ] || exit 0
+mount | grep -q "\$SAFE_PATH" || { mount --bind "\$SAFE_PATH" /www && service httpd restart; }
+grep -q "\$SAFE_SCRIPT" "\$SAFE_PATH/tomato.js" 2>/dev/null || \
+    printf 'document.addEventListener("DOMContentLoaded",function(){var s=document.createElement("script");s.src="/%s";document.head.appendChild(s);});\n' \
+    "\$SAFE_SCRIPT" >> "\$SAFE_PATH/tomato.js"
+FALLBACKEOF
+    chmod 755 "$NGINX_PATH/boot.sh"
+
     mount --bind "$INSTALL_PATH" /www
     service httpd restart >/dev/null 2>&1
-
-    BOOT_HOOK="# --- Theme Startup ---
-sleep 10
-[ -d $SAFE_PATH ] || exit 0
-mount | grep -q $SAFE_PATH || { mount --bind $SAFE_PATH /www && service httpd restart; }
-grep -q $SAFE_SCRIPT $SAFE_PATH/tomato.js 2>/dev/null || echo 'document.addEventListener(\"DOMContentLoaded\",function(){var s=document.createElement(\"script\");s.src=\"/$SAFE_SCRIPT\";document.head.appendChild(s);});' >> $SAFE_PATH/tomato.js
-# --- End Theme Startup ---"
 
     LOGIN_STATUS="${YELLOW}Basic Auth (nginx unavailable)${NC}"
 fi
 
-# Simpan boot hook
-CLEAN=$(nvram get script_init | awk '/# --- Theme Startup ---/{f=1} f{next} {print} /# --- End Theme Startup ---/{f=0}')
-if [ -n "$(nvram get script_init)" ]; then
-    nvram set script_init="$CLEAN
-$BOOT_HOOK"
+# =================================================================
+# INJECT KE script_init — hanya satu baris, semua logic di boot.sh
+# Preserve semua konfigurasi custom user yang sudah ada di init
+# =================================================================
+BOOT_ENTRY="sh $SAFE_NGINX/boot.sh"
+MARKER_START="# --- FreshTomato Theme ---"
+MARKER_END="# --- End FreshTomato Theme ---"
+BOOT_BLOCK="$MARKER_START
+sleep 10
+$BOOT_ENTRY
+$MARKER_END"
+
+# Ambil script_init yang ada, hapus blok theme lama (jika ada), preserve sisanya
+CURRENT=$(nvram get script_init 2>/dev/null)
+
+# Strip blok theme lama — antara marker (termasuk marker-nya)
+STRIPPED=$(printf '%s
+' "$CURRENT" | awk "
+    /^# --- FreshTomato Theme ---\$/ { skip=1; next }
+    /^# --- End FreshTomato Theme ---\$/ { skip=0; next }
+    /^# --- Theme Startup ---\$/ { skip=1; next }
+    /^# --- End Theme Startup ---\$/ { skip=0; next }
+    skip { next }
+    { print }
+")
+
+# Trim trailing blank lines dari STRIPPED
+STRIPPED=$(printf '%s' "$STRIPPED" | sed '/^[[:space:]]*$/d')
+
+# Gabungkan: konfigurasi user (jika ada) + blok theme baru
+if [ -n "$STRIPPED" ]; then
+    nvram set script_init="$STRIPPED
+
+$BOOT_BLOCK"
 else
-    nvram set script_init="$BOOT_HOOK"
+    nvram set script_init="$BOOT_BLOCK"
 fi
 nvram commit >/dev/null 2>&1
 
