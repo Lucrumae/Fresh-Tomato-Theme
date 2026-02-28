@@ -300,164 +300,230 @@
     }
 
     // -- REBOOT CONFIRM + REBOOT PAGE ----------------------------
-    // Override function reboot() global FreshTomato (bukan window.confirm)
-    // sehingga tidak ada busy-wait / page unresponsive
+    // Approach: intercept confirm() untuk dialog custom,
+    // lalu jalankan reboot ASLI (biarkan FreshTomato handle request & navigate).
+    // Setelah navigate ke halaman reboot, inject waiting UI via initRebootUI().
 
-    // --- CUSTOM CONFIRM DIALOG ---
-    function showRebootConfirm(onConfirm) {
+    var _origConfirm = window.confirm;
+
+    window.confirm = function(msg) {
+        var m = (msg || '').toString().toLowerCase();
+        if(m.indexOf('reboot') === -1 && m.indexOf('restart') === -1) {
+            return _origConfirm ? _origConfirm.call(window, msg) : true;
+        }
+        // Tampilkan dialog kita async, return false dulu
+        setTimeout(showRebootDialog, 0);
+        return false;
+    };
+
+    function getAccentNow() {
+        var root = document.documentElement;
+        var acc = (getComputedStyle(root).getPropertyValue('--accent') || '').trim();
+        if(acc) return acc;
+        var vid = document.querySelector('video');
+        if(vid && vid.readyState >= 2) {
+            try {
+                var cv = document.createElement('canvas');
+                cv.width = 8; cv.height = 8;
+                var cx = cv.getContext('2d');
+                cx.drawImage(vid, 0, 0, 8, 8);
+                var px = cx.getImageData(0,0,8,8).data, r=0,g=0,b=0,n=0;
+                for(var i=0;i<px.length;i+=4){
+                    var br=(px[i]+px[i+1]+px[i+2])/3;
+                    if(br<20||br>235) continue;
+                    r+=px[i];g+=px[i+1];b+=px[i+2];n++;
+                }
+                if(n>0) return 'rgb('+~~(r/n)+','+~~(g/n)+','+~~(b/n)+')';
+            } catch(e){}
+        }
+        return '#e8a86e';
+    }
+
+    function showRebootDialog() {
+        if(document.getElementById('ft-dlg')) return;
+        var acc = getAccentNow();
+
         var s = document.createElement('style');
         s.id = 'ft-dlg-style';
         s.textContent =
-            '#ft-dlg-backdrop{position:fixed;inset:0;z-index:99998;' +
-            'background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);' +
-            '-webkit-backdrop-filter:blur(4px);animation:ftDlgBgIn 0.2s ease;}' +
-            '@keyframes ftDlgBgIn{from{opacity:0;}to{opacity:1;}}' +
+            '#ft-dlg-bd{position:fixed;inset:0;z-index:99998;' +
+                'background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);' +
+                '-webkit-backdrop-filter:blur(4px);animation:ftBdIn .2s ease;}' +
+            '@keyframes ftBdIn{from{opacity:0}to{opacity:1}}' +
             '#ft-dlg{position:fixed;top:50%;left:50%;' +
-            'transform:translate(-50%,-54%) scale(0.96);' +
-            'z-index:99999;background:rgba(8,6,10,0.75);' +
-            'border:1px solid rgba(255,255,255,0.12);border-radius:18px;' +
-            'padding:32px 36px 24px;min-width:280px;max-width:340px;' +
-            'backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);' +
-            'box-shadow:0 16px 56px rgba(0,0,0,0.7);text-align:center;' +
-            'font-family:Outfit,sans-serif;' +
-            'animation:ftDlgIn 0.25s cubic-bezier(0.22,1,0.36,1) forwards;}' +
-            '@keyframes ftDlgIn{from{opacity:0;transform:translate(-50%,-46%) scale(0.94);}' +
-            'to{opacity:1;transform:translate(-50%,-54%) scale(1);}}' +
-            '#ft-dlg.ft-dlg-out{animation:ftDlgOut 0.18s ease forwards!important;}' +
-            '@keyframes ftDlgOut{to{opacity:0;transform:translate(-50%,-46%) scale(0.95);}}' +
-            '#ft-dlg-icon{width:40px;height:40px;margin:0 auto 16px;display:block;}' +
-            '#ft-dlg-title{font-size:17px;font-weight:700;color:#f0ece8;margin-bottom:6px;}' +
-            '#ft-dlg-sub{font-size:12px;color:rgba(240,236,232,0.45);' +
-            'margin-bottom:24px;line-height:1.5;}' +
-            '#ft-dlg-btns{display:flex;gap:10px;}' +
-            '#ft-dlg-ok{flex:1;padding:11px;border:none;border-radius:10px;' +
-            'background:var(--accent,#e8a86e);color:#0e0810;font-size:13px;' +
-            'font-weight:700;font-family:Outfit,sans-serif;cursor:pointer;' +
-            'transition:opacity 0.15s,transform 0.15s;}' +
-            '#ft-dlg-ok:hover{opacity:0.85;transform:translateY(-1px);}' +
-            '#ft-dlg-cancel{flex:1;padding:11px;' +
-            'border:1px solid rgba(255,255,255,0.12);border-radius:10px;' +
-            'background:rgba(255,255,255,0.06);color:rgba(240,236,232,0.7);' +
-            'font-size:13px;font-family:Outfit,sans-serif;cursor:pointer;' +
-            'transition:opacity 0.15s,transform 0.15s;}' +
-            '#ft-dlg-cancel:hover{opacity:0.75;transform:translateY(-1px);}';
-        document.head.appendChild(s);
+                'z-index:99999;background:rgba(8,6,10,.80);' +
+                'border:1px solid rgba(255,255,255,.10);border-radius:18px;' +
+                'padding:32px 36px 24px;min-width:280px;max-width:340px;' +
+                'backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);' +
+                'box-shadow:0 16px 56px rgba(0,0,0,.7);text-align:center;' +
+                'font-family:Outfit,sans-serif;' +
+                'animation:ftDlgIn .25s cubic-bezier(.22,1,.36,1) forwards;}' +
+            '@keyframes ftDlgIn{' +
+                'from{opacity:0;transform:translate(-50%,-46%) scale(.94);}' +
+                'to{opacity:1;transform:translate(-50%,-54%) scale(1);}}' +
+            '#ft-dlg.out{animation:ftDlgOut .18s ease forwards!important;}' +
+            '@keyframes ftDlgOut{' +
+                'to{opacity:0;transform:translate(-50%,-46%) scale(.95)}}' +
+            '#ft-dlg svg{display:block;margin:0 auto 16px;width:40px;height:40px;}' +
+            '#ft-dlg h3{font-size:17px;font-weight:700;color:#f0ece8;margin:0 0 6px;}' +
+            '#ft-dlg p{font-size:12px;color:rgba(240,236,232,.45);' +
+                'margin:0 0 24px;line-height:1.5;}' +
+            '#ft-dlg-row{display:flex;gap:10px;}' +
+            '#ft-dlg-no{flex:1;padding:11px;' +
+                'border:1px solid rgba(255,255,255,.12);border-radius:10px;' +
+                'background:rgba(255,255,255,.06);color:rgba(240,236,232,.7);' +
+                'font-size:13px;font-family:Outfit,sans-serif;cursor:pointer;' +
+                'transition:opacity .15s,transform .15s;}' +
+            '#ft-dlg-no:hover{opacity:.75;transform:translateY(-1px)}' +
+            '#ft-dlg-yes{flex:1;padding:11px;border:none;border-radius:10px;' +
+                'font-size:13px;font-weight:700;font-family:Outfit,sans-serif;' +
+                'cursor:pointer;color:#0e0810;' +
+                'transition:opacity .15s,transform .15s;}' +
+            '#ft-dlg-yes:hover{opacity:.85;transform:translateY(-1px)}';
 
-        var backdrop = document.createElement('div');
-        backdrop.id = 'ft-dlg-backdrop';
-        var dlg = document.createElement('div');
-        dlg.id = 'ft-dlg';
+        var bd = document.createElement('div'); bd.id = 'ft-dlg-bd';
+        var dlg = document.createElement('div'); dlg.id = 'ft-dlg';
         dlg.innerHTML =
-            '<svg id="ft-dlg-icon" viewBox="0 0 24 24" fill="none"' +
-            ' stroke="var(--accent,#e8a86e)" stroke-width="1.5"' +
-            ' stroke-linecap="round" stroke-linejoin="round">' +
+            '<svg viewBox="0 0 24 24" fill="none"' +
+            ' stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
             '<path d="M21 2v6h-6"/>' +
             '<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>' +
             '<path d="M3 22v-6h6"/>' +
             '<path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>' +
             '</svg>' +
-            '<div id="ft-dlg-title">Reboot Router?</div>' +
-            '<div id="ft-dlg-sub">The router will restart.<br>' +
-            'You will be disconnected briefly.</div>' +
-            '<div id="ft-dlg-btns">' +
-            '<button id="ft-dlg-cancel">Cancel</button>' +
-            '<button id="ft-dlg-ok">Reboot</button>' +
+            '<h3>Reboot Router?</h3>' +
+            '<p>The router will restart.<br>You will be disconnected briefly.</p>' +
+            '<div id="ft-dlg-row">' +
+            '<button id="ft-dlg-no">Cancel</button>' +
+            '<button id="ft-dlg-yes">Reboot</button>' +
             '</div>';
 
-        document.body.appendChild(backdrop);
+        document.head.appendChild(s);
+        document.body.appendChild(bd);
         document.body.appendChild(dlg);
 
-        // Sync accent color dari adaptive jika ada
-        var acc = getComputedStyle(document.documentElement)
-                      .getPropertyValue('--accent').trim();
-        if(acc) {
-            var okBtn = document.getElementById('ft-dlg-ok');
-            if(okBtn) okBtn.style.background = acc;
-            var icon = document.getElementById('ft-dlg-icon');
-            if(icon) icon.setAttribute('stroke', acc);
+        function applyAccent(c) {
+            var yes = document.getElementById('ft-dlg-yes');
+            var ico = dlg.querySelector('svg');
+            if(yes) yes.style.background = c;
+            if(ico) ico.setAttribute('stroke', c);
         }
+        applyAccent(acc);
 
-        function cleanUp() {
-            dlg.classList.add('ft-dlg-out');
-            backdrop.style.transition = 'opacity 0.18s ease';
-            backdrop.style.opacity = '0';
+        // Live sync warna accent
+        var mo = new MutationObserver(function() {
+            var c = (getComputedStyle(document.documentElement)
+                         .getPropertyValue('--accent') || '').trim();
+            if(c) applyAccent(c);
+        });
+        mo.observe(document.documentElement, {
+            attributes: true, attributeFilter: ['style']
+        });
+        var syncT = setInterval(function() {
+            var c = (getComputedStyle(document.documentElement)
+                         .getPropertyValue('--accent') || '').trim();
+            if(c) applyAccent(c);
+        }, 200);
+
+        function close() {
+            mo.disconnect(); clearInterval(syncT);
+            dlg.classList.add('out');
+            bd.style.transition = 'opacity .18s ease';
+            bd.style.opacity = '0';
             setTimeout(function() {
-                dlg.parentNode && dlg.parentNode.removeChild(dlg);
-                backdrop.parentNode && backdrop.parentNode.removeChild(backdrop);
-                var st = document.getElementById('ft-dlg-style');
-                st && st.parentNode && st.parentNode.removeChild(st);
+                [dlg, bd, s].forEach(function(el) {
+                    el.parentNode && el.parentNode.removeChild(el);
+                });
             }, 200);
         }
 
-        document.getElementById('ft-dlg-ok').addEventListener('click', function() {
-            cleanUp();
-            setTimeout(onConfirm, 220); // jalankan reboot setelah animasi
-        });
-        document.getElementById('ft-dlg-cancel').addEventListener('click', cleanUp);
-        backdrop.addEventListener('click', cleanUp);
-    }
-
-    // Override reboot() global — FreshTomato memanggil ini dari href & menu
-    function installRebootOverride() {
-        // Simpan referensi original jika ada
-        var _origReboot = typeof window.reboot === 'function'
-                          ? window.reboot : null;
-
-        window.reboot = function() {
-            showRebootConfirm(function() {
-                // Jalankan reboot asli atau fallback ke submit form
-                if(_origReboot) {
-                    _origReboot();
+        document.getElementById('ft-dlg-yes').addEventListener('click', function() {
+            close();
+            // Setelah animasi, jalankan reboot ASLI:
+            // Ganti confirm sementara jadi return true, panggil reboot(), restore
+            setTimeout(function() {
+                window.confirm = function(){ return true; };
+                if(typeof window.reboot === 'function') {
+                    window.reboot();
                 } else {
-                    // FreshTomato fallback: kirim form reboot langsung
-                    var form = document.createElement('form');
-                    form.method = 'post';
-                    form.action = '/tomato.cgi';
-                    var fields = {
-                        '_nextpage': 'admin-reboot.asp',
-                        '_action': 'reboot',
-                        'submit_button': 'status-overview'
+                    // Fallback: klik link reboot yang ada di DOM
+                    var a = document.querySelector('a[href*="reboot"]');
+                    if(a) { a.click(); }
+                }
+                // Restore confirm setelah sedikit delay
+                setTimeout(function() {
+                    window.confirm = function(msg) {
+                        var m = (msg||'').toString().toLowerCase();
+                        if(m.indexOf('reboot')===-1 && m.indexOf('restart')===-1) {
+                            return _origConfirm ? _origConfirm.call(window,msg) : true;
+                        }
+                        setTimeout(showRebootDialog, 0);
+                        return false;
                     };
-                    Object.keys(fields).forEach(function(k) {
-                        var inp = document.createElement('input');
-                        inp.type = 'hidden';
-                        inp.name = k;
-                        inp.value = fields[k];
-                        form.appendChild(inp);
-                    });
-                    document.body.appendChild(form);
-                    form.submit();
-                }
-            });
-        };
-
-        // Override juga semua link href="javascript:reboot()"
-        function patchLinks() {
-            var links = document.querySelectorAll('a[href*="reboot"]');
-            links.forEach(function(a) {
-                if(a.getAttribute('href').indexOf('reboot') !== -1) {
-                    a.setAttribute('href', 'javascript:void(0)');
-                    a.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        window.reboot();
-                    });
-                }
-            });
-        }
-        if(document.body) patchLinks();
-        else document.addEventListener('DOMContentLoaded', patchLinks);
-        // Juga patch setelah DOM mungkin berubah (FreshTomato SPA-like)
-        document.addEventListener('DOMContentLoaded', patchLinks);
+                }, 2000);
+            }, 220);
+        });
+        document.getElementById('ft-dlg-no').addEventListener('click', close);
+        bd.addEventListener('click', close);
     }
 
-    installRebootOverride();
+    // Patch link reboot di DOM agar tidak trigger confirm langsung
+    // (opsional — hanya untuk link yang bypass window.reboot)
+    function patchRebootLinks() {
+        document.querySelectorAll('[href*="reboot"],[onclick*="reboot"]')
+            .forEach(function(el) {
+                if(el.dataset.ftPatch) return;
+                el.dataset.ftPatch = '1';
+                var oc = el.getAttribute('onclick') || '';
+                if(oc.indexOf('reboot') !== -1) {
+                    el.setAttribute('onclick', 'return false;');
+                    el.addEventListener('click', function(e) {
+                        e.preventDefault(); e.stopPropagation();
+                        showRebootDialog();
+                    });
+                }
+                var hr = el.getAttribute('href') || '';
+                if(hr.indexOf('reboot') !== -1) {
+                    el.setAttribute('href', 'javascript:void(0)');
+                    el.addEventListener('click', function(e) {
+                        e.preventDefault(); e.stopPropagation();
+                        showRebootDialog();
+                    });
+                }
+            });
+    }
+
+    function installPatcher() {
+        patchRebootLinks();
+        var pmo = new MutationObserver(function(muts) {
+            muts.forEach(function(m) {
+                m.addedNodes.forEach(function(n) {
+                    if(n.nodeType===1) {
+                        if((n.getAttribute('href')||'').indexOf('reboot')!==-1 ||
+                           (n.getAttribute('onclick')||'').indexOf('reboot')!==-1) {
+                            n.dataset.ftPatch = '';
+                            patchRebootLinks();
+                        }
+                        n.querySelectorAll && n.querySelectorAll(
+                            '[href*="reboot"],[onclick*="reboot"]'
+                        ).forEach(function(c){ c.dataset.ftPatch=''; patchRebootLinks(); });
+                    }
+                });
+            });
+        });
+        pmo.observe(document.body||document.documentElement,
+            {childList:true, subtree:true});
+    }
+    if(document.body) installPatcher();
+    else document.addEventListener('DOMContentLoaded', installPatcher);
 
     // --- REBOOT WAITING PAGE ---
+    // Dijalankan saat browser navigate ke halaman reboot asli FreshTomato
     function initRebootUI() {
         var allElems = document.querySelectorAll('*');
         var found = false;
-        for(var i = 0; i < allElems.length; i++) {
-            if(allElems[i].children.length === 0 &&
+        for(var i=0; i<allElems.length; i++) {
+            if(allElems[i].children.length===0 &&
                allElems[i].textContent.indexOf(
                    'Please wait while the router reboots') !== -1) {
                 found = true; break;
@@ -465,79 +531,69 @@
         }
         if(!found) return;
 
-        // Sembunyikan konten asli
         document.body.style.cssText =
             'margin:0;padding:0;overflow:hidden;background:#080610;';
-        for(var c = 0; c < document.body.children.length; c++) {
+        for(var c=0; c<document.body.children.length; c++) {
             document.body.children[c].style.display = 'none';
         }
 
-        // Style
-        var vidStyle = document.createElement('style');
-        vidStyle.textContent =
+        var s = document.createElement('style');
+        s.textContent =
             '#ft-rb-video{position:fixed;inset:0;width:100vw;height:100vh;' +
             'object-fit:cover;z-index:0;pointer-events:none;}' +
             '#ft-rb-overlay{position:fixed;inset:0;z-index:1;' +
-            'background:rgba(8,6,10,0.50);transition:background 1.2s ease;}' +
+            'background:rgba(8,6,10,.50);transition:background 1.2s ease;}' +
             '#ft-rb-wrap{position:fixed;inset:0;z-index:2;display:flex;' +
             'align-items:center;justify-content:center;}' +
-            '#ft-rb-card{background:rgba(8,6,10,0.52);' +
-            'border:1px solid rgba(255,255,255,0.10);border-radius:20px;' +
+            '#ft-rb-card{background:rgba(8,6,10,.52);' +
+            'border:1px solid rgba(255,255,255,.10);border-radius:20px;' +
             'padding:44px 52px;backdrop-filter:blur(24px);' +
             '-webkit-backdrop-filter:blur(24px);' +
-            'box-shadow:0 8px 48px rgba(0,0,0,0.6);text-align:center;' +
+            'box-shadow:0 8px 48px rgba(0,0,0,.6);text-align:center;' +
             'min-width:300px;transition:background 1.2s ease,border-color 1.2s ease;' +
-            'animation:ftCardIn 0.5s cubic-bezier(0.22,1,0.36,1);}' +
-            '@keyframes ftCardIn{from{opacity:0;transform:translateY(20px) scale(0.97);}' +
+            'animation:ftCardIn .5s cubic-bezier(.22,1,.36,1);}' +
+            '@keyframes ftCardIn{' +
+            'from{opacity:0;transform:translateY(20px) scale(.97);}' +
             'to{opacity:1;transform:translateY(0) scale(1);}}' +
             '#ft-rb-icon{width:48px;height:48px;margin:0 auto 20px;display:block;' +
             'animation:ftRbSpin 1.8s linear infinite;}' +
-            '@keyframes ftRbSpin{from{transform:rotate(0deg);}' +
-            'to{transform:rotate(360deg);}}' +
+            '@keyframes ftRbSpin{to{transform:rotate(360deg)}}' +
             '#ft-rb-title{font-size:18px;font-weight:700;color:#f0ece8;' +
-            'letter-spacing:-0.01em;margin-bottom:6px;font-family:Outfit,sans-serif;}' +
-            '#ft-rb-sub{font-size:11px;color:rgba(240,236,232,0.40);' +
-            'letter-spacing:0.14em;text-transform:uppercase;' +
+            'letter-spacing:-.01em;margin-bottom:6px;font-family:Outfit,sans-serif;}' +
+            '#ft-rb-sub{font-size:11px;color:rgba(240,236,232,.40);' +
+            'letter-spacing:.14em;text-transform:uppercase;' +
             'font-family:"Space Mono",monospace;margin-bottom:28px;}' +
             '#ft-rb-bar-wrap{width:100%;height:3px;' +
-            'background:rgba(255,255,255,0.08);border-radius:4px;' +
+            'background:rgba(255,255,255,.08);border-radius:4px;' +
             'overflow:hidden;margin-bottom:14px;}' +
             '#ft-rb-bar{height:100%;width:0%;border-radius:4px;' +
             'background:linear-gradient(90deg,' +
             'var(--accent,#e8a86e),var(--accent2,#7ec8e3));' +
-            'transition:width 1s linear;' +
-            'box-shadow:0 0 10px rgba(232,168,110,0.4);}' +
-            '#ft-rb-count{font-size:12px;color:rgba(240,236,232,0.45);' +
-            'font-family:Outfit,sans-serif;letter-spacing:0.04em;}' +
+            'transition:width 1s linear;}' +
+            '#ft-rb-count{font-size:12px;color:rgba(240,236,232,.45);' +
+            'font-family:Outfit,sans-serif;letter-spacing:.04em;}' +
             '#ft-rb-count b{color:var(--accent,#e8a86e);font-size:14px;}';
-        document.head.appendChild(vidStyle);
+        document.head.appendChild(s);
 
-        // Video bg
         var vid = document.createElement('video');
-        vid.id = 'ft-rb-video';
-        vid.autoplay = true; vid.loop = true;
-        vid.muted = true; vid.playsInline = true;
+        vid.id='ft-rb-video'; vid.autoplay=true;
+        vid.loop=true; vid.muted=true; vid.playsInline=true;
         var src = document.createElement('source');
-        src.src = '/bgmp4.gif'; src.type = 'video/mp4';
+        src.src='/bgmp4.gif'; src.type='video/mp4';
         vid.appendChild(src);
 
-        var overlay = document.createElement('div');
-        overlay.id = 'ft-rb-overlay';
+        var overlay = document.createElement('div'); overlay.id='ft-rb-overlay';
+        var wrap    = document.createElement('div'); wrap.id='ft-rb-wrap';
 
-        var wrap = document.createElement('div');
-        wrap.id = 'ft-rb-wrap';
-
-        // Ambil countdown dari halaman asli
+        // Ambil countdown dari halaman asli FreshTomato
         var total = 120;
-        var countEl = document.querySelector(
-            '[id*="count"],[name*="count"],input[type=text]');
+        var countEl = document.querySelector('input[type=text],#count,#countdown');
         if(countEl) {
             var v = parseInt(countEl.value || countEl.textContent);
-            if(v > 0 && v < 300) total = v;
+            if(v>0 && v<300) total=v;
         }
 
-        var card = document.createElement('div');
-        card.id = 'ft-rb-card';
+        var card = document.createElement('div'); card.id='ft-rb-card';
         card.innerHTML =
             '<svg id="ft-rb-icon" viewBox="0 0 24 24" fill="none"' +
             ' stroke="var(--accent,#e8a86e)" stroke-width="1.5"' +
@@ -551,81 +607,73 @@
             '<div id="ft-rb-sub">Please Wait</div>' +
             '<div id="ft-rb-bar-wrap"><div id="ft-rb-bar"></div></div>' +
             '<div id="ft-rb-count">Redirecting in ' +
-            '<b id="ft-rb-num">' + total + '</b>s</div>';
+            '<b id="ft-rb-num">'+total+'</b>s</div>';
 
         wrap.appendChild(card);
         document.body.insertBefore(vid, document.body.firstChild);
         document.body.insertBefore(overlay, vid.nextSibling);
         document.body.appendChild(wrap);
-        [vid, overlay, wrap].forEach(function(el) {
-            el.style.display = '';
-        });
-
-        // Adaptive color dari video
-        var cv = document.createElement('canvas');
-        cv.width = 64; cv.height = 36;
-        var ctx = cv.getContext('2d');
-        var lastHue = -1;
-
-        function H(h,s,l){h/=360;s/=100;l/=100;var q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;function f(t){t<0&&(t+=1);t>1&&(t-=1);return t<1/6?p+(q-p)*6*t:t<.5?q:t<2/3?p+(q-p)*(2/3-t)*6:p;}return[~~(f(h+1/3)*255),~~(f(h)*255),~~(f(h-1/3)*255)];}
-        function toHsl(r,g,b){r/=255;g/=255;b/=255;var mx=Math.max(r,g,b),mn=Math.min(r,g,b),h,s,l=(mx+mn)/2;if(mx===mn){h=s=0;}else{var d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?((g-b)/d+(g<b?6:0))/6:mx===g?((b-r)/d+2)/6:((r-g)/d+4)/6;}return[h*360,s*100,l*100];}
-
-        function adaptColor() {
-            if(vid.readyState < 2) { setTimeout(adaptColor, 500); return; }
-            try {
-                ctx.drawImage(vid, 0, 0, 64, 36);
-                var px = ctx.getImageData(0,0,64,36).data,
-                    r=0,g=0,b=0,n=0;
-                for(var i=0;i<px.length;i+=4){
-                    var br=(px[i]+px[i+1]+px[i+2])/3;
-                    if(br<15||br>240) continue;
-                    r+=px[i];g+=px[i+1];b+=px[i+2];n++;
-                }
-                if(!n) return;
-                r=~~(r/n); g=~~(g/n); b=~~(b/n);
-                var hsl=toHsl(r,g,b), hue=hsl[0], sat=hsl[1], lum=hsl[2];
-                var d=Math.abs(hue-lastHue); if(d>180) d=360-d;
-                if(lastHue < 0 || d >= 5) {
-                    lastHue = hue;
-                    var dark=lum<50, s2=Math.max(sat,50);
-                    var acc  = H(hue, Math.max(s2,65), dark?68:42);
-                    var acc2 = H((hue+40)%360, Math.max(s2,55), dark?72:40);
-                    var pan  = H(hue, Math.min(s2,40),
-                                 dark?Math.min(lum+8,20):Math.max(lum-8,80));
-                    var ov = Math.max(pan[0]-30,0)+','+
-                             Math.max(pan[1]-30,0)+','+
-                             Math.max(pan[2]-30,0);
-                    var root = document.documentElement;
-                    overlay.style.background = 'rgba('+ov+',0.50)';
-                    card.style.background =
-                        'rgba('+pan[0]+','+pan[1]+','+pan[2]+',0.48)';
-                    card.style.borderColor =
-                        'rgba('+acc[0]+','+acc[1]+','+acc[2]+',0.20)';
-                    root.style.setProperty('--accent',
-                        'rgb('+acc[0]+','+acc[1]+','+acc[2]+')');
-                    root.style.setProperty('--accent2',
-                        'rgb('+acc2[0]+','+acc2[1]+','+acc2[2]+')');
-                }
-            } catch(e) {}
-            setTimeout(adaptColor, 500);
-        }
-        vid.addEventListener('canplay', adaptColor, {once: true});
+        [vid,overlay,wrap].forEach(function(el){ el.style.display=''; });
         vid.play().catch(function(){});
 
-        // Countdown
-        var elapsed = 0;
-        var bar = document.getElementById('ft-rb-bar');
-        var num = document.getElementById('ft-rb-num');
-        var timer = setInterval(function() {
+        // Adaptive color
+        var cv=document.createElement('canvas'); cv.width=64; cv.height=36;
+        var ctx=cv.getContext('2d'); var lastHue=-1;
+        function H(h,s,l){h/=360;s/=100;l/=100;var q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;function f(t){t<0&&(t+=1);t>1&&(t-=1);return t<1/6?p+(q-p)*6*t:t<.5?q:t<2/3?p+(q-p)*(2/3-t)*6:p;}return[~~(f(h+1/3)*255),~~(f(h)*255),~~(f(h-1/3)*255)];}
+        function toHsl(r,g,b){r/=255;g/=255;b/=255;var mx=Math.max(r,g,b),mn=Math.min(r,g,b),h,s,l=(mx+mn)/2;if(mx===mn){h=s=0;}else{var d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?((g-b)/d+(g<b?6:0))/6:mx===g?((b-r)/d+2)/6:((r-g)/d+4)/6;}return[h*360,s*100,l*100];}
+        function adaptColor(){
+            if(vid.readyState<2){setTimeout(adaptColor,500);return;}
+            try{
+                ctx.drawImage(vid,0,0,64,36);
+                var px=ctx.getImageData(0,0,64,36).data,r=0,g=0,b=0,n=0;
+                for(var i=0;i<px.length;i+=4){var br=(px[i]+px[i+1]+px[i+2])/3;if(br<15||br>240)continue;r+=px[i];g+=px[i+1];b+=px[i+2];n++;}
+                if(!n)return;
+                r=~~(r/n);g=~~(g/n);b=~~(b/n);
+                var hsl=toHsl(r,g,b),hue=hsl[0],sat=hsl[1],lum=hsl[2];
+                var d=Math.abs(hue-lastHue);if(d>180)d=360-d;
+                if(lastHue<0||d>=5){
+                    lastHue=hue;
+                    var dark=lum<50,s2=Math.max(sat,50);
+                    var acc=H(hue,Math.max(s2,65),dark?68:42);
+                    var ac2=H((hue+40)%360,Math.max(s2,55),dark?72:40);
+                    var pan=H(hue,Math.min(s2,40),dark?Math.min(lum+8,20):Math.max(lum-8,80));
+                    var ov=Math.max(pan[0]-30,0)+','+Math.max(pan[1]-30,0)+','+Math.max(pan[2]-30,0);
+                    overlay.style.background='rgba('+ov+',.50)';
+                    card.style.background='rgba('+pan[0]+','+pan[1]+','+pan[2]+',.48)';
+                    card.style.borderColor='rgba('+acc[0]+','+acc[1]+','+acc[2]+',.20)';
+                    document.documentElement.style.setProperty('--accent','rgb('+acc[0]+','+acc[1]+','+acc[2]+')');
+                    document.documentElement.style.setProperty('--accent2','rgb('+ac2[0]+','+ac2[1]+','+ac2[2]+')');
+                }
+            }catch(e){}
+            setTimeout(adaptColor,500);
+        }
+        vid.addEventListener('canplay',adaptColor,{once:true});
+
+        // Countdown — ikuti countdown asli dari halaman FreshTomato jika ada
+        var elapsed=0,bar=document.getElementById('ft-rb-bar'),num=document.getElementById('ft-rb-num');
+        var timer=setInterval(function(){
+            // Sync dengan countdown asli jika masih ada
+            if(countEl){ var v=parseInt(countEl.value||countEl.textContent); if(v>0&&v<300){total=v+elapsed;} }
             elapsed++;
-            if(bar) bar.style.width = Math.min((elapsed/total)*100,100)+'%';
-            if(num) num.textContent = Math.max(total-elapsed, 0);
-            if(elapsed >= total) clearInterval(timer);
-        }, 1000);
+            if(bar) bar.style.width=Math.min((elapsed/total)*100,100)+'%';
+            if(num) num.textContent=Math.max(total-elapsed,0);
+            if(elapsed>=total) clearInterval(timer);
+        },1000);
     }
 
-    if(document.body) initRebootUI();
-    else document.addEventListener('DOMContentLoaded', initRebootUI);
+    // Jalankan initRebootUI sekarang jika body sudah ada,
+    // atau tunggu DOMContentLoaded, ATAU poll sampai teks reboot muncul
+    function tryRebootUI() {
+        if(document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initRebootUI);
+        } else {
+            initRebootUI();
+            // Jika belum found (konten belum render), poll sekali lagi
+            setTimeout(initRebootUI, 500);
+            setTimeout(initRebootUI, 1500);
+        }
+    }
+    tryRebootUI();
 
 
 
