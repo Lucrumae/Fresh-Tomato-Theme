@@ -57,16 +57,8 @@
 Paste this single command into your router's SSH terminal:
 
 ```sh
-wget -O - https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/install | sh
+wget -O - https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/install.sh | sh
 ```
-
-The installer will:
-1. Fetch the latest theme catalog from this repository
-2. Show you a list of available themes to choose from
-3. Mirror the system `/www` to JFFS for persistence
-4. Download and extract your chosen theme
-5. Inject the video background script into all pages
-6. Mount and activate — no reboot needed
 
 After installation, press **Ctrl + F5** in your browser to clear the cache.
 
@@ -135,7 +127,7 @@ Then press **Ctrl + F5** in your browser. Your video should now play as the back
 Paste this single command into your router's SSH terminal to fully remove the theme:
 
 ```sh
-umount -l /www && rm -rf /jffs/mywww && nvram set script_init="$(nvram get script_init | awk '/# --- Theme Startup ---/{found=1} !found{print}')" && nvram commit && service httpd restart
+wget -O - https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/uninstall.sh | sh
 ```
 
 This will in order: unmount the theme, delete all theme files from JFFS, remove the boot hook from NVRAM, save NVRAM, and restart the web server. After running, press **Ctrl + F5** in your browser to confirm the default UI is restored. ✅
