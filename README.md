@@ -15,25 +15,28 @@
 ## ✨ Themes Preview
 > *Just ignore the CPU temperature. My device does have a problem with the cooling system.*
 
-### ⬜ Material White
-![Material White Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/MaterialWhite/preview.png)
-
----
-
-### ⬛ Material Black
-![Material Black Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/MaterialBlack/preview.png)
-
----
-
-### 🐈 Sleeping Cat
-![Sleeping Cat Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/SleepingCat/preview.png)
-
----
-
-### 🎸 Bocchi The Rock
-![Bocchi The Rock Theme](https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/BocchiTheRock/preview.png)
-
----
+<table>
+  <tr>
+    <td align="center">
+      <b>⬜ Material White</b><br>
+      <img src="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/MaterialWhite/preview.png" width="400">
+    </td>
+    <td align="center">
+      <b>⬛ Material Black</b><br>
+      <img src="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/MaterialBlack/preview.png" width="400">
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <b>🐈 Sleeping Cat</b><br>
+      <img src="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/SleepingCat/preview.png" width="400">
+    </td>
+    <td align="center">
+      <b>🎸 Bocchi The Rock</b><br>
+      <img src="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/BocchiTheRock/preview.png" width="400">
+    </td>
+  </tr>
+</table>
 
 ### 🎨 Adaptive & Adaptive Realtime
 
