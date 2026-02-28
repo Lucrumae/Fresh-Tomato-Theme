@@ -185,6 +185,16 @@ fi
 cp "$INSTALL_PATH/login.html" "$NGINX_PATH/static/login.html"
 SIZE=$(ls -lh "$INSTALL_PATH/login.html" | awk '{print $5}')
 echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+
+# admin-reboot.html — custom reboot waiting page dengan video background
+printf "        ${DIM}%-22s${NC} " "admin-reboot.html"
+do_wget "$BASE_URL/admin-reboot.html" "$INSTALL_PATH/admin-reboot.html"
+if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/admin-reboot.html" ]; then
+    SIZE=$(ls -lh "$INSTALL_PATH/admin-reboot.html" | awk '{print $5}')
+    echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+else
+    echo -e "${DIM}skipped${NC} ${DIM}(optional)${NC}"
+fi
 echo ""
 
 [ -n "$failed_files" ] && fail "Required files failed:$failed_files" && exit 1
