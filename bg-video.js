@@ -446,48 +446,204 @@
         return m ? decodeURIComponent(m[1]) : null;
     }
 
-    // Jalankan reboot:
-    // 1. Kirim POST ke httpd:8008 langsung dengan Authorization header
-    // 2. Navigasi ke /tomato.cgi (reboot waiting page via nginx proxy)
+    // Tampilkan UI reboot waiting langsung di halaman ini (tanpa navigasi)
+    // sekaligus kirim request reboot via fetch ke nginx proxy
     function doReboot() {
+        // --- Tampilkan reboot waiting UI ---
+        showRebootWaiting();
+
+        // --- Kirim reboot request ---
         var cred = getAuthCred();
         var body = '_nextpage=admin-reboot.asp' +
                    '&_action=reboot' +
                    '&submit_button=status-overview';
 
-        var headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
-        // Kirim langsung ke httpd:8008 dengan Authorization agar bypass nginx auth issue
-        // Ini sama persis dengan yang dilakukan nginx saat proxy request
-        if(cred) headers['Authorization'] = cred;
+        // Kirim via nginx proxy (port 80) dengan X-Login-Auth header
+        // persis seperti request normal dari halaman FreshTomato
+        var headers = {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Login-Auth': cred || ''
+        };
 
-        // Kirim POST reboot — router akan segera reboot setelah terima request ini
-        // Tidak perlu tunggu response karena router langsung putus
         if(typeof fetch !== 'undefined') {
-            fetch('http://192.168.1.1:8008/tomato.cgi', {
+            fetch('/tomato.cgi', {
                 method: 'POST',
                 headers: headers,
                 body: body,
-                // No credentials include — kita set manual
-                mode: 'no-cors' // hindari CORS preflight yang bisa delay
-            }).catch(function(){
-                // Error expected — router reboot = disconnect
-            });
+                credentials: 'include'
+            }).catch(function(){ /* router disconnect = expected */ });
         } else {
-            // Fallback XHR untuk browser lama
             var xhr = new XMLHttpRequest();
-            xhr.open('POST', 'http://192.168.1.1:8008/tomato.cgi', true);
-            Object.keys(headers).forEach(function(k) {
+            xhr.open('POST', '/tomato.cgi', true);
+            Object.keys(headers).forEach(function(k){
                 xhr.setRequestHeader(k, headers[k]);
             });
             xhr.send(body);
         }
+    }
 
-        // Navigasi ke halaman proxy nginx setelah 300ms
-        // nginx akan forward ke httpd:8008 yang sedang reboot
-        // hasilnya akan tampil halaman "Please wait while the router reboots"
-        setTimeout(function() {
-            window.location.href = '/tomato.cgi';
-        }, 300);
+    // Inject reboot waiting UI langsung di halaman yang sedang dibuka
+    // tanpa navigasi — tidak ada 502 karena tidak ada page load baru
+    function showRebootWaiting() {
+        // Sembunyikan semua konten halaman
+        var all = document.body.children;
+        for(var i = 0; i < all.length; i++) {
+            all[i].style.display = 'none';
+        }
+        document.body.style.overflow = 'hidden';
+
+        var total = 120; // detik countdown
+
+        // Inject video background + card UI
+        var s = document.createElement('style');
+        s.textContent =
+            '#ft-rb-video{position:fixed;inset:0;width:100vw;height:100vh;' +
+            'object-fit:cover;z-index:0;pointer-events:none;}' +
+            '#ft-rb-overlay{position:fixed;inset:0;z-index:1;' +
+            'background:rgba(8,6,10,0.50);transition:background 1.2s ease;}' +
+            '#ft-rb-wrap{position:fixed;inset:0;z-index:2;display:flex;' +
+            'align-items:center;justify-content:center;}' +
+            '#ft-rb-card{background:rgba(8,6,10,0.52);' +
+            'border:1px solid rgba(255,255,255,0.10);border-radius:20px;' +
+            'padding:44px 52px;backdrop-filter:blur(24px);' +
+            '-webkit-backdrop-filter:blur(24px);' +
+            'box-shadow:0 8px 48px rgba(0,0,0,0.6);text-align:center;' +
+            'min-width:300px;' +
+            'transition:background 1.2s ease,border-color 1.2s ease;' +
+            'animation:ftRbCardIn .5s cubic-bezier(.22,1,.36,1);}' +
+            '@keyframes ftRbCardIn{' +
+            'from{opacity:0;transform:translateY(20px) scale(.97);}' +
+            'to{opacity:1;transform:translateY(0) scale(1);}}' +
+            '#ft-rb-icon{width:48px;height:48px;margin:0 auto 20px;display:block;' +
+            'animation:ftRbSpin 1.8s linear infinite;}' +
+            '@keyframes ftRbSpin{to{transform:rotate(360deg)}}' +
+            '#ft-rb-title{font-size:18px;font-weight:700;color:#f0ece8;' +
+            'letter-spacing:-.01em;margin-bottom:6px;font-family:Outfit,sans-serif;}' +
+            '#ft-rb-sub{font-size:11px;color:rgba(240,236,232,.40);' +
+            'letter-spacing:.14em;text-transform:uppercase;' +
+            'font-family:"Space Mono",monospace;margin-bottom:28px;}' +
+            '#ft-rb-bar-wrap{width:100%;height:3px;' +
+            'background:rgba(255,255,255,.08);border-radius:4px;' +
+            'overflow:hidden;margin-bottom:14px;}' +
+            '#ft-rb-bar{height:100%;width:0%;border-radius:4px;' +
+            'background:linear-gradient(90deg,' +
+            'var(--accent,#e8a86e),var(--accent2,#7ec8e3));' +
+            'transition:width 1s linear;' +
+            'box-shadow:0 0 10px rgba(232,168,110,.4);}' +
+            '#ft-rb-count{font-size:12px;color:rgba(240,236,232,.45);' +
+            'font-family:Outfit,sans-serif;letter-spacing:.04em;}' +
+            '#ft-rb-count b{color:var(--accent,#e8a86e);font-size:14px;}';
+        document.head.appendChild(s);
+
+        var vid = document.createElement('video');
+        vid.id = 'ft-rb-video'; vid.autoplay = true;
+        vid.loop = true; vid.muted = true; vid.playsInline = true;
+        var src = document.createElement('source');
+        src.src = '/bgmp4.gif'; src.type = 'video/mp4';
+        vid.appendChild(src);
+
+        var overlay = document.createElement('div');
+        overlay.id = 'ft-rb-overlay';
+        var wrap = document.createElement('div');
+        wrap.id = 'ft-rb-wrap';
+        var card = document.createElement('div');
+        card.id = 'ft-rb-card';
+        card.innerHTML =
+            '<svg id="ft-rb-icon" viewBox="0 0 24 24" fill="none"' +
+            ' stroke="var(--accent,#e8a86e)" stroke-width="1.5"' +
+            ' stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M21 2v6h-6"/>' +
+            '<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>' +
+            '<path d="M3 22v-6h6"/>' +
+            '<path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>' +
+            '</svg>' +
+            '<div id="ft-rb-title">Rebooting Router</div>' +
+            '<div id="ft-rb-sub">Please Wait</div>' +
+            '<div id="ft-rb-bar-wrap"><div id="ft-rb-bar"></div></div>' +
+            '<div id="ft-rb-count">Redirecting in ' +
+            '<b id="ft-rb-num">' + total + '</b>s</div>';
+        wrap.appendChild(card);
+
+        document.body.insertBefore(vid, document.body.firstChild);
+        document.body.insertBefore(overlay, vid.nextSibling);
+        document.body.appendChild(wrap);
+        [vid, overlay, wrap].forEach(function(el){ el.style.display = ''; });
+        vid.play().catch(function(){});
+
+        // Adaptive color dari video
+        var cv = document.createElement('canvas');
+        cv.width = 64; cv.height = 36;
+        var ctx = cv.getContext('2d');
+        var lastHue = -1;
+
+        function H(h,s,l){h/=360;s/=100;l/=100;var q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;function f(t){t<0&&(t+=1);t>1&&(t-=1);return t<1/6?p+(q-p)*6*t:t<.5?q:t<2/3?p+(q-p)*(2/3-t)*6:p;}return[~~(f(h+1/3)*255),~~(f(h)*255),~~(f(h-1/3)*255)];}
+        function toHsl(r,g,b){r/=255;g/=255;b/=255;var mx=Math.max(r,g,b),mn=Math.min(r,g,b),h,s,l=(mx+mn)/2;if(mx===mn){h=s=0;}else{var d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?((g-b)/d+(g<b?6:0))/6:mx===g?((b-r)/d+2)/6:((r-g)/d+4)/6;}return[h*360,s*100,l*100];}
+
+        function adaptColor() {
+            if(vid.readyState < 2){ setTimeout(adaptColor, 500); return; }
+            try {
+                ctx.drawImage(vid, 0, 0, 64, 36);
+                var px=ctx.getImageData(0,0,64,36).data,r=0,g=0,b=0,n=0;
+                for(var i=0;i<px.length;i+=4){
+                    var br=(px[i]+px[i+1]+px[i+2])/3;
+                    if(br<15||br>240) continue;
+                    r+=px[i];g+=px[i+1];b+=px[i+2];n++;
+                }
+                if(!n) return;
+                r=~~(r/n);g=~~(g/n);b=~~(b/n);
+                var hsl=toHsl(r,g,b),hue=hsl[0],sat=hsl[1],lum=hsl[2];
+                var d=Math.abs(hue-lastHue); if(d>180)d=360-d;
+                if(lastHue<0||d>=5){
+                    lastHue=hue;
+                    var dark=lum<50,s2=Math.max(sat,50);
+                    var acc=H(hue,Math.max(s2,65),dark?68:42);
+                    var ac2=H((hue+40)%360,Math.max(s2,55),dark?72:40);
+                    var pan=H(hue,Math.min(s2,40),
+                              dark?Math.min(lum+8,20):Math.max(lum-8,80));
+                    var ov=Math.max(pan[0]-30,0)+','+
+                           Math.max(pan[1]-30,0)+','+
+                           Math.max(pan[2]-30,0);
+                    overlay.style.background='rgba('+ov+',0.50)';
+                    card.style.background=
+                        'rgba('+pan[0]+','+pan[1]+','+pan[2]+',0.48)';
+                    card.style.borderColor=
+                        'rgba('+acc[0]+','+acc[1]+','+acc[2]+',0.20)';
+                    document.documentElement.style.setProperty('--accent',
+                        'rgb('+acc[0]+','+acc[1]+','+acc[2]+')');
+                    document.documentElement.style.setProperty('--accent2',
+                        'rgb('+ac2[0]+','+ac2[1]+','+ac2[2]+')');
+                }
+            } catch(e){}
+            setTimeout(adaptColor, 500);
+        }
+        vid.addEventListener('canplay', adaptColor, {once:true});
+
+        // Countdown + auto reload setelah selesai
+        var elapsed=0,
+            bar=document.getElementById('ft-rb-bar'),
+            num=document.getElementById('ft-rb-num');
+        var timer = setInterval(function(){
+            elapsed++;
+            if(bar) bar.style.width=Math.min((elapsed/total)*100,100)+'%';
+            if(num) num.textContent=Math.max(total-elapsed,0);
+            if(elapsed>=total){
+                clearInterval(timer);
+                window.location.href='/';
+            }
+        }, 1000);
+
+        // Cek apakah router sudah kembali online setiap 5 detik
+        // begitu online, redirect ke login page
+        setTimeout(function checkOnline(){
+            fetch('/login.html', {
+                method: 'HEAD', credentials: 'omit',
+                cache: 'no-store'
+            }).then(function(r){
+                if(r.ok) window.location.href = '/';
+            }).catch(function(){
+                setTimeout(checkOnline, 5000);
+            });
+        }, 15000); // mulai cek setelah 15 detik (minimum reboot time)
     }
 
     // Patch semua existing & future onclick="...reboot..." elements
