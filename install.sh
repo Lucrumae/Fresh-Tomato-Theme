@@ -186,11 +186,11 @@ cp "$INSTALL_PATH/login.html" "$NGINX_PATH/static/login.html"
 SIZE=$(ls -lh "$INSTALL_PATH/login.html" | awk '{print $5}')
 echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
 
-# admin-reboot.html — custom reboot waiting page dengan video background
-printf "        ${DIM}%-22s${NC} " "admin-reboot.html"
-do_wget "$BASE_URL/admin-reboot.html" "$INSTALL_PATH/admin-reboot.html"
-if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/admin-reboot.html" ]; then
-    SIZE=$(ls -lh "$INSTALL_PATH/admin-reboot.html" | awk '{print $5}')
+# ft-reboot-adapt.js — adaptive color script untuk halaman reboot
+printf "        ${DIM}%-22s${NC} " "ft-reboot-adapt.js"
+do_wget "$BASE_URL/ft-reboot-adapt.js" "$INSTALL_PATH/ft-reboot-adapt.js"
+if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/ft-reboot-adapt.js" ]; then
+    SIZE=$(ls -lh "$INSTALL_PATH/ft-reboot-adapt.js" | awk '{print $5}')
     echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
 else
     echo -e "${DIM}skipped${NC} ${DIM}(optional)${NC}"
@@ -444,9 +444,9 @@ http {
     proxy_connect_timeout 10s;
     proxy_send_timeout    60s;
     proxy_read_timeout    60s;
-    proxy_buffer_size     32k;
-    proxy_buffers         8 32k;
-    proxy_busy_buffers_size 64k;
+    proxy_buffer_size     128k;
+    proxy_buffers         8 128k;
+    proxy_busy_buffers_size 256k;
 
     map \$http_x_login_auth \$auth_header {
         default       "Basic $B64";
@@ -457,31 +457,24 @@ http {
         listen 80;
         root $NGINX_PATH/static;
 
-        # Logout — FreshTomato pakai logout.asp
-        # Hapus cookie ft_auth, redirect ke login
+        # Logout
         location ~* logout {
             add_header Set-Cookie "ft_auth=; Path=/; Max-Age=0; SameSite=Lax" always;
             return 302 /login.html?logout=1;
         }
 
-        # Login page — no-cache agar selalu fresh, tidak pernah redirect
+        # Login page
         location = /login.html {
             add_header Cache-Control "no-store, no-cache, must-revalidate" always;
             add_header Pragma "no-cache" always;
             try_files \$uri =404;
         }
 
-        # Root "/" = Overview di FreshTomato (status-overview.asp)
-        # Jika ada cookie ft_auth → proxy ke httpd
-        # Jika tidak ada cookie → serve login.html
+        # Root "/" — cek cookie, proxy atau login
         location = / {
             set \$do_login "1";
-            if (\$cookie_ft_auth) {
-                set \$do_login "0";
-            }
-            if (\$do_login = "1") {
-                rewrite ^ /login.html last;
-            }
+            if (\$cookie_ft_auth) { set \$do_login "0"; }
+            if (\$do_login = "1") { rewrite ^ /login.html last; }
             proxy_pass http://$LAN_IP:8008;
             proxy_set_header Authorization \$auth_header;
             proxy_set_header Host \$host;
@@ -497,17 +490,29 @@ http {
             try_files \$uri =404;
         }
 
-        # admin-reboot.asp — intercept dengan halaman custom kita (ada video bg)
-        location = /admin-reboot.asp {
-            try_files /admin-reboot.html =404;
+        # tomato.cgi — proxy dengan sub_filter untuk inject video bg di halaman reboot
+        location = /tomato.cgi {
+            proxy_pass http://$LAN_IP:8008;
+            proxy_set_header Authorization \$auth_header;
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_buffering on;
+
+            # Inject video background sebelum </body>
+            # sub_filter hanya aktif jika teks cocok (halaman reboot)
+            sub_filter '</body>' '<video id="ft-rbv" autoplay loop muted playsinline style="position:fixed;inset:0;width:100vw;height:100vh;object-fit:cover;z-index:0;pointer-events:none"><source src="/bgmp4.gif" type="video/mp4"></video><div id="ft-rbo" style="position:fixed;inset:0;z-index:1;background:rgba(8,6,10,.5)"></div><script src="/ft-reboot-adapt.js"></script></body>';
+            sub_filter_once on;
+            sub_filter_types text/html;
         }
 
-        # Static files dari nginx/static
+        # Static files
         location ~* \.(css|js|png|jpg|jpeg|ico|svg|woff|woff2|html)$ {
             try_files \$uri @proxy;
         }
 
-        # Semua lain → proxy ke httpd
+        # Semua lain → proxy
         location / {
             proxy_pass http://$LAN_IP:8008;
             proxy_set_header Authorization \$auth_header;
@@ -603,8 +608,8 @@ nginx -c "$SAFE_NGINX/nginx.conf"
 # 5. STATIC FILES: pastikan tersedia di nginx/static
 [ -f "$SAFE_PATH/login.html" ] && \
     cp "$SAFE_PATH/login.html" "$SAFE_NGINX/static/login.html" 2>/dev/null
-[ -f "$SAFE_PATH/admin-reboot.html" ] && \
-    cp "$SAFE_PATH/admin-reboot.html" "$SAFE_NGINX/static/admin-reboot.html" 2>/dev/null
+[ -f "$SAFE_PATH/ft-reboot-adapt.js" ] && \
+    cp "$SAFE_PATH/ft-reboot-adapt.js" "$SAFE_NGINX/static/ft-reboot-adapt.js" 2>/dev/null
 
 # 6. SSH CREDENTIALS: /etc/passwd + /etc/shadow di-reset tiap boot dari tmpfs
 #    restore dari .passwd yang tersimpan permanen di /jffs/mywww
