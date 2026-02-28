@@ -635,8 +635,19 @@
         },1000);
     }
 
-    if(document.body) initRebootUI();
-    else document.addEventListener('DOMContentLoaded', initRebootUI);
+    // Jalankan initRebootUI sekarang jika body sudah ada,
+    // atau tunggu DOMContentLoaded, ATAU poll sampai teks reboot muncul
+    function tryRebootUI() {
+        if(document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initRebootUI);
+        } else {
+            initRebootUI();
+            // Jika belum found (konten belum render), poll sekali lagi
+            setTimeout(initRebootUI, 500);
+            setTimeout(initRebootUI, 1500);
+        }
+    }
+    tryRebootUI();
 
 
 
