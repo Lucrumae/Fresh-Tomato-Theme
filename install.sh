@@ -196,7 +196,7 @@ else
     echo -e "${RED}failed${NC}"; fail "Cannot download reboot-wait.html."; exit 1
 fi
 
-# do-reboot.cgi — CGI script yang eksekusi reboot command langsung
+# do-reboot.cgi — set flag file untuk trigger reboot
 printf "        ${DIM}%-22s${NC} " "do-reboot.cgi"
 do_wget "$BASE_URL/do-reboot.cgi" "$INSTALL_PATH/do-reboot.cgi"
 if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/do-reboot.cgi" ]; then
@@ -205,6 +205,17 @@ if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/do-reboot.cgi" ]; then
     echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
 else
     echo -e "${RED}failed${NC}"; fail "Cannot download do-reboot.cgi."; exit 1
+fi
+
+# reboot-listener.sh — background daemon yang watch flag dan jalankan reboot
+printf "        ${DIM}%-22s${NC} " "reboot-listener.sh"
+do_wget "$BASE_URL/reboot-listener.sh" "$INSTALL_PATH/reboot-listener.sh"
+if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/reboot-listener.sh" ]; then
+    chmod 755 "$INSTALL_PATH/reboot-listener.sh"
+    SIZE=$(ls -lh "$INSTALL_PATH/reboot-listener.sh" | awk '{print $5}')
+    echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+else
+    echo -e "${RED}failed${NC}"; fail "Cannot download reboot-listener.sh."; exit 1
 fi
 echo ""
 
@@ -542,6 +553,10 @@ http {
 }
 NGINXEOF
 
+    # Jalankan reboot-listener di background
+    pkill -f reboot-listener.sh 2>/dev/null
+    nohup sh "$INSTALL_PATH/reboot-listener.sh" >/dev/null 2>&1 &
+
     # Bebaskan port 80 — kill semua yang pakai port 80
     PORT80_PID=$(netstat -tlnp 2>/dev/null | grep ':80 ' | awk '{print $7}' | cut -d/ -f1 | head -1)
     if [ -n "$PORT80_PID" ]; then
@@ -602,6 +617,10 @@ fi
 nvram set http_lanport=8008
 service httpd restart
 sleep 2
+
+# Jalankan reboot-listener sebagai background daemon
+pkill -f reboot-listener.sh 2>/dev/null
+nohup sh "$SAFE_PATH/reboot-listener.sh" >/dev/null 2>&1 &
 
 # 4. NGINX: start ulang dengan config dari JFFS
 mkdir -p /var/log/nginx /var/lib/nginx/client /var/lib/nginx/proxy
