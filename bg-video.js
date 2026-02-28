@@ -413,18 +413,23 @@
 
         document.getElementById('ft-dlg-yes').addEventListener('click', function() {
             close();
-            // Setelah animasi, jalankan reboot ASLI:
-            // Ganti confirm sementara jadi return true, panggil reboot(), restore
             setTimeout(function() {
+                // Tampilkan waiting UI di halaman ini DULU
+                showRebootWaiting();
+                // Lalu kirim reboot — set confirm return true agar FreshTomato tidak stuck
                 window.confirm = function(){ return true; };
                 if(typeof window.reboot === 'function') {
                     window.reboot();
                 } else {
-                    // Fallback: klik link reboot yang ada di DOM
                     var a = document.querySelector('a[href*="reboot"]');
                     if(a) { a.click(); }
                 }
-                // Restore confirm setelah sedikit delay
+                // Prevent navigation ke /tomato.cgi agar waiting UI tetap tampil
+                window.onbeforeunload = function(){ return ''; };
+                setTimeout(function(){
+                    window.onbeforeunload = null;
+                }, 500);
+                // Restore confirm intercept
                 setTimeout(function() {
                     window.confirm = function(msg) {
                         var m = (msg||'').toString().toLowerCase();
@@ -441,7 +446,140 @@
         bd.addEventListener('click', close);
     }
 
-    // Patch link reboot di DOM agar tidak trigger confirm langsung
+    // Tampilkan waiting UI dengan video background di halaman saat ini
+    function showRebootWaiting() {
+        if(document.getElementById('ft-rbv')) return;
+
+        // Sembunyikan semua konten halaman
+        document.body.style.cssText = 'margin:0;padding:0;overflow:hidden;background:#080610;';
+        var kids = document.body.children;
+        for(var i = 0; i < kids.length; i++) kids[i].style.display = 'none';
+
+        var total = 120;
+
+        // Inject styles
+        var s = document.createElement('style');
+        s.textContent =
+            '#ft-rbv{position:fixed;inset:0;width:100vw;height:100vh;' +
+            'object-fit:cover;z-index:0;pointer-events:none}' +
+            '#ft-rbo{position:fixed;inset:0;z-index:1;' +
+            'background:rgba(8,6,10,.50);transition:background 1.2s ease}' +
+            '#ft-rbw{position:fixed;inset:0;z-index:2;display:flex;' +
+            'align-items:center;justify-content:center}' +
+            '#ft-rbc{background:rgba(8,6,10,.52);' +
+            'border:1px solid rgba(255,255,255,.10);border-radius:20px;' +
+            'padding:44px 52px;backdrop-filter:blur(24px);' +
+            '-webkit-backdrop-filter:blur(24px);' +
+            'box-shadow:0 8px 48px rgba(0,0,0,.6);text-align:center;min-width:300px;' +
+            'transition:background 1.2s ease,border-color 1.2s ease;' +
+            'animation:ftCIn .5s cubic-bezier(.22,1,.36,1)}' +
+            '@keyframes ftCIn{from{opacity:0;transform:translateY(20px) scale(.97)}' +
+            'to{opacity:1;transform:translateY(0) scale(1)}}' +
+            '#ft-rbico{width:48px;height:48px;margin:0 auto 20px;display:block;' +
+            'animation:ftSp 1.8s linear infinite}' +
+            '@keyframes ftSp{to{transform:rotate(360deg)}}' +
+            '#ft-rbt{font-size:18px;font-weight:700;color:#f0ece8;' +
+            'letter-spacing:-.01em;margin-bottom:6px;font-family:Outfit,sans-serif}' +
+            '#ft-rbs{font-size:11px;color:rgba(240,236,232,.40);' +
+            'letter-spacing:.14em;text-transform:uppercase;' +
+            'font-family:"Space Mono",monospace;margin-bottom:28px}' +
+            '#ft-rbbw{width:100%;height:3px;background:rgba(255,255,255,.08);' +
+            'border-radius:4px;overflow:hidden;margin-bottom:14px}' +
+            '#ft-rbb{height:100%;width:0%;border-radius:4px;' +
+            'background:linear-gradient(90deg,var(--accent,#e8a86e),var(--accent2,#7ec8e3));' +
+            'transition:width 1s linear}' +
+            '#ft-rbcnt{font-size:12px;color:rgba(240,236,232,.45);' +
+            'font-family:Outfit,sans-serif;letter-spacing:.04em}' +
+            '#ft-rbcnt b{color:var(--accent,#e8a86e);font-size:14px}';
+        document.head.appendChild(s);
+
+        // Video
+        var vid = document.createElement('video');
+        vid.id = 'ft-rbv'; vid.autoplay = true;
+        vid.loop = true; vid.muted = true; vid.playsInline = true;
+        var src = document.createElement('source');
+        src.src = '/bgmp4.gif'; src.type = 'video/mp4';
+        vid.appendChild(src);
+
+        var ov   = document.createElement('div'); ov.id  = 'ft-rbo';
+        var wrap = document.createElement('div'); wrap.id = 'ft-rbw';
+        var card = document.createElement('div'); card.id = 'ft-rbc';
+
+        card.innerHTML =
+            '<svg id="ft-rbico" viewBox="0 0 24 24" fill="none"' +
+            ' stroke="var(--accent,#e8a86e)" stroke-width="1.5"' +
+            ' stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M21 2v6h-6"/>' +
+            '<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>' +
+            '<path d="M3 22v-6h6"/>' +
+            '<path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>' +
+            '</svg>' +
+            '<div id="ft-rbt">Rebooting Router</div>' +
+            '<div id="ft-rbs">Please Wait</div>' +
+            '<div id="ft-rbbw"><div id="ft-rbb"></div></div>' +
+            '<div id="ft-rbcnt">Redirecting in <b id="ft-rbn">' + total + '</b>s</div>';
+
+        wrap.appendChild(card);
+        document.body.insertBefore(vid, document.body.firstChild);
+        document.body.insertBefore(ov, vid.nextSibling);
+        document.body.appendChild(wrap);
+        [vid, ov, wrap].forEach(function(el){ el.style.display = ''; });
+        vid.play().catch(function(){});
+
+        // Adaptive color dari video
+        var cv = document.createElement('canvas');
+        cv.width = 64; cv.height = 36;
+        var ctx = cv.getContext('2d'), lastHue = -1;
+
+        function H(h,s,l){h/=360;s/=100;l/=100;var q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;function f(t){t<0&&(t+=1);t>1&&(t-=1);return t<1/6?p+(q-p)*6*t:t<.5?q:t<2/3?p+(q-p)*(2/3-t)*6:p;}return[~~(f(h+1/3)*255),~~(f(h)*255),~~(f(h-1/3)*255)];}
+        function toHsl(r,g,b){r/=255;g/=255;b/=255;var mx=Math.max(r,g,b),mn=Math.min(r,g,b),h,s,l=(mx+mn)/2;if(mx===mn){h=s=0;}else{var d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?((g-b)/d+(g<b?6:0))/6:mx===g?((b-r)/d+2)/6:((r-g)/d+4)/6;}return[h*360,s*100,l*100];}
+
+        function adaptColor(){
+            if(vid.readyState<2){setTimeout(adaptColor,500);return;}
+            try{
+                ctx.drawImage(vid,0,0,64,36);
+                var px=ctx.getImageData(0,0,64,36).data,r=0,g=0,b=0,n=0;
+                for(var i=0;i<px.length;i+=4){var br=(px[i]+px[i+1]+px[i+2])/3;if(br<15||br>240)continue;r+=px[i];g+=px[i+1];b+=px[i+2];n++;}
+                if(!n)return;
+                r=~~(r/n);g=~~(g/n);b=~~(b/n);
+                var hsl=toHsl(r,g,b),hue=hsl[0],sat=hsl[1],lum=hsl[2];
+                var d=Math.abs(hue-lastHue);if(d>180)d=360-d;
+                if(lastHue<0||d>=5){
+                    lastHue=hue;
+                    var dark=lum<50,s2=Math.max(sat,50);
+                    var acc=H(hue,Math.max(s2,65),dark?68:42);
+                    var ac2=H((hue+40)%360,Math.max(s2,55),dark?72:40);
+                    var pan=H(hue,Math.min(s2,40),dark?Math.min(lum+8,20):Math.max(lum-8,80));
+                    var ovC=Math.max(pan[0]-30,0)+','+Math.max(pan[1]-30,0)+','+Math.max(pan[2]-30,0);
+                    ov.style.background='rgba('+ovC+',.50)';
+                    card.style.background='rgba('+pan[0]+','+pan[1]+','+pan[2]+',.48)';
+                    card.style.borderColor='rgba('+acc[0]+','+acc[1]+','+acc[2]+',.20)';
+                    document.documentElement.style.setProperty('--accent','rgb('+acc[0]+','+acc[1]+','+acc[2]+')');
+                    document.documentElement.style.setProperty('--accent2','rgb('+ac2[0]+','+ac2[1]+','+ac2[2]+')');
+                }
+            }catch(e){}
+            setTimeout(adaptColor,500);
+        }
+        vid.addEventListener('canplay', adaptColor, {once:true});
+
+        // Countdown + cek router online
+        var elapsed=0, bar=document.getElementById('ft-rbb'), num=document.getElementById('ft-rbn');
+        var timer=setInterval(function(){
+            elapsed++;
+            if(bar) bar.style.width=Math.min((elapsed/total)*100,100)+'%';
+            if(num) num.textContent=Math.max(total-elapsed,0);
+            if(elapsed>=total) clearInterval(timer);
+        },1000);
+
+        // Cek router online setiap 5s mulai detik ke-15
+        setTimeout(function poll(){
+            fetch('/login.html',{method:'HEAD',cache:'no-store',credentials:'omit'})
+                .then(function(r){ if(r.ok) window.location.replace('/'); })
+                .catch(function(){ setTimeout(poll,5000); });
+        }, 15000);
+    }
+
+        // Patch link reboot di DOM agar tidak trigger confirm langsung
     // (opsional — hanya untuk link yang bypass window.reboot)
     function patchRebootLinks() {
         document.querySelectorAll('[href*="reboot"],[onclick*="reboot"]')
@@ -492,18 +630,22 @@
     else document.addEventListener('DOMContentLoaded', installPatcher);
 
     // --- REBOOT WAITING PAGE ---
-    // Dijalankan saat browser navigate ke halaman reboot asli FreshTomato
+    // Deteksi halaman reboot: cek URL /tomato.cgi DAN body mengandung teks reboot
     function initRebootUI() {
-        var allElems = document.querySelectorAll('*');
-        var found = false;
-        for(var i=0; i<allElems.length; i++) {
-            if(allElems[i].children.length===0 &&
-               allElems[i].textContent.indexOf(
-                   'Please wait while the router reboots') !== -1) {
-                found = true; break;
-            }
-        }
+        // Cek URL dulu - halaman reboot selalu di /tomato.cgi
+        var isRebootUrl = window.location.pathname.indexOf('tomato.cgi') !== -1 ||
+                          window.location.pathname.indexOf('reboot') !== -1;
+        if(!isRebootUrl) return;
+
+        // Cek apakah body mengandung teks reboot (case-insensitive)
+        var bodyText = (document.body && document.body.innerText || '').toLowerCase();
+        var found = bodyText.indexOf('please wait') !== -1 ||
+                    bodyText.indexOf('reboots') !== -1 ||
+                    bodyText.indexOf('reboot') !== -1;
         if(!found) return;
+
+        // Pastikan belum pernah inject
+        if(document.getElementById('ft-rb-video')) return;
 
         document.body.style.cssText =
             'margin:0;padding:0;overflow:hidden;background:#080610;';
@@ -635,16 +777,27 @@
         },1000);
     }
 
-    // Jalankan initRebootUI sekarang jika body sudah ada,
-    // atau tunggu DOMContentLoaded, ATAU poll sampai teks reboot muncul
+    // Jalankan initRebootUI — poll beberapa kali untuk catch semua timing
     function tryRebootUI() {
-        if(document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initRebootUI);
-        } else {
+        // Cek URL sekarang sebelum apapun
+        var path = window.location.pathname;
+        var isRebootPage = path.indexOf('tomato.cgi') !== -1 ||
+                           path.indexOf('reboot') !== -1;
+        if(!isRebootPage) return;
+
+        // Poll sampai body siap dan konten ter-render
+        var attempts = 0;
+        function attempt() {
+            if(document.getElementById('ft-rb-video')) return; // sudah inject
             initRebootUI();
-            // Jika belum found (konten belum render), poll sekali lagi
-            setTimeout(initRebootUI, 500);
-            setTimeout(initRebootUI, 1500);
+            attempts++;
+            if(attempts < 10) setTimeout(attempt, 300);
+        }
+
+        if(document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', attempt);
+        } else {
+            attempt();
         }
     }
     tryRebootUI();
