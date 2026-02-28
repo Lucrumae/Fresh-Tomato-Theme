@@ -37,8 +37,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080610;
   transition:width 1s linear}
 #cnt{font-size:12px;color:rgba(240,236,232,.45);letter-spacing:.04em}
 #cnt b{color:var(--a,#e8a86e);font-size:14px}
-#status{font-size:11px;color:rgba(240,236,232,.30);margin-top:10px;
-  font-family:"Space Mono",monospace;letter-spacing:.06em}
+#status{font-size:11px;color:rgba(240,236,232,.25);margin-top:10px;
+  font-family:"Space Mono",monospace;letter-spacing:.06em;min-height:16px}
 </style>
 </head>
 <body>
@@ -69,53 +69,14 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080610;
   var elapsed = 0;
   var bar     = document.getElementById('bar');
   var num     = document.getElementById('num');
-  var status  = document.getElementById('status');
+  var statusEl= document.getElementById('status');
   var ov      = document.getElementById('ov');
   var card    = document.getElementById('card');
   var ico     = document.getElementById('ico');
 
-  // ── 1. Baca credentials dari cookie ft_auth ──────────────────
-  function getCred(){
-    var m = document.cookie.match(/(?:^|;\s*)ft_auth=([^;]+)/);
-    return m ? decodeURIComponent(m[1]) : null;
-  }
+  function setStatus(msg){ if(statusEl) statusEl.textContent = msg; }
 
-  // ── 2. Kirim reboot command ke httpd:8008 langsung ───────────
-  //    (bypass nginx — langsung ke FreshTomato httpd dengan Basic Auth)
-  function sendReboot(){
-    var cred = getCred();
-    if(!cred){ setStatus('No credentials — check login'); return; }
-
-    var body = 'submit_button=status-overview&_nextpage=admin-reboot.asp&_action=reboot';
-
-    // Coba XHR ke httpd langsung di port 8008
-    var xhr = new XMLHttpRequest();
-    xhr.open('POST', 'http://192.168.1.1:8008/tomato.cgi', true);
-    xhr.setRequestHeader('Content-Type','application/x-www-form-urlencoded');
-    xhr.setRequestHeader('Authorization', cred);
-    xhr.timeout = 10000;
-    xhr.onreadystatechange = function(){
-      if(xhr.readyState === 4){
-        if(xhr.status === 200 || xhr.status === 302 || xhr.status === 0){
-          setStatus('Reboot sent — waiting for restart…');
-        } else {
-          setStatus('Sent (status ' + xhr.status + ')');
-        }
-        startCountdown();
-      }
-    };
-    xhr.ontimeout = xhr.onerror = function(){
-      // Timeout/error = router sudah mulai reboot (disconnect)
-      setStatus('Reboot in progress…');
-      startCountdown();
-    };
-    xhr.send(body);
-
-    // Safety: mulai countdown setelah 3 detik walau tidak ada response
-    setTimeout(startCountdown, 3000);
-  }
-
-  // ── 3. Countdown + progress bar ──────────────────────────────
+  // ── 1. Countdown ─────────────────────────────────────────────
   var countdownStarted = false;
   function startCountdown(){
     if(countdownStarted) return;
@@ -128,7 +89,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080610;
     }, 1000);
   }
 
-  // ── 4. Poll router sampai online ─────────────────────────────
+  // ── 2. Poll router sampai online ─────────────────────────────
   function pollOnline(){
     fetch('/login.html',{method:'HEAD',cache:'no-store',credentials:'omit'})
       .then(function(r){
@@ -139,8 +100,65 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080610;
       })
       .catch(function(){ setTimeout(pollOnline, 4000); });
   }
-  // Mulai poll setelah 20 detik (minimum reboot time)
-  setTimeout(pollOnline, 20000);
+
+  // ── 3. Kirim reboot via do-reboot.cgi ────────────────────────
+  // CGI ini berjalan sebagai root → eksekusi `reboot` langsung
+  function sendReboot(){
+    var cred = (function(){
+      var m = document.cookie.match(/(?:^|;\s*)ft_auth=([^;]+)/);
+      return m ? decodeURIComponent(m[1]) : '';
+    })();
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/do-reboot.cgi', true);
+    // Kirim credentials via header — nginx forward ke httpd
+    if(cred) xhr.setRequestHeader('X-Login-Auth', cred);
+    xhr.timeout = 8000;
+
+    xhr.onreadystatechange = function(){
+      if(xhr.readyState !== 4) return;
+      if(xhr.responseText && xhr.responseText.indexOf('OK') !== -1){
+        setStatus('Reboot command sent — restarting…');
+      } else if(xhr.responseText === 'FAIL'){
+        setStatus('Auth failed — retrying via direct POST…');
+        sendRebootDirect();
+        return;
+      } else {
+        setStatus('Reboot in progress…');
+      }
+      startCountdown();
+      setTimeout(pollOnline, 20000);
+    };
+
+    xhr.ontimeout = xhr.onerror = function(){
+      // Timeout = router sudah disconnect = reboot berhasil
+      setStatus('Reboot in progress…');
+      startCountdown();
+      setTimeout(pollOnline, 20000);
+    };
+
+    xhr.send();
+  }
+
+  // ── 4. Fallback: POST langsung ke FreshTomato httpd:8008 ─────
+  function sendRebootDirect(){
+    var cred = (function(){
+      var m = document.cookie.match(/(?:^|;\s*)ft_auth=([^;]+)/);
+      return m ? decodeURIComponent(m[1]) : '';
+    })();
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', 'http://192.168.1.1:8008/tomato.cgi', true);
+    xhr.setRequestHeader('Content-Type','application/x-www-form-urlencoded');
+    if(cred) xhr.setRequestHeader('Authorization', cred);
+    xhr.timeout = 8000;
+    xhr.ontimeout = xhr.onerror = xhr.onload = function(){
+      setStatus('Reboot in progress…');
+      startCountdown();
+      setTimeout(pollOnline, 20000);
+    };
+    xhr.send('submit_button=status-overview&_nextpage=admin-reboot.asp&_action=reboot');
+  }
 
   // ── 5. Adaptive color dari video ─────────────────────────────
   var vid = document.getElementById('bg');
@@ -167,7 +185,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080610;
       var d=Math.abs(hue-lastHue); if(d>180) d=360-d;
       if(lastHue<0||d>=5){
         lastHue=hue;
-        var dark=lum<50, s2=Math.max(sat,50);
+        var dark=lum<50,s2=Math.max(sat,50);
         var acc=H(hue,Math.max(s2,65),dark?68:42);
         var ac2=H((hue+40)%360,Math.max(s2,55),dark?72:40);
         var pan=H(hue,Math.min(s2,40),dark?Math.min(lum+8,20):Math.max(lum-8,80));
@@ -186,8 +204,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080610;
   }
   vid.addEventListener('canplay', sample, {once:true});
   vid.play().catch(function(){});
-
-  function setStatus(msg){ if(status) status.textContent = msg; }
 
   // ── Start ─────────────────────────────────────────────────────
   sendReboot();
