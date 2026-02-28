@@ -1,4 +1,4 @@
-/* adaptiverealtime.js — FreshTomato Realtime Adaptive Theme
+/* adaptiverealtime.js - FreshTomato Realtime Adaptive Theme
    - Default: muted sampai user aktifkan
    - Popup "click anywhere to unmute" saat audio pernah ON
    - requestAnimationFrame + throttle 100ms
@@ -43,7 +43,7 @@
     if(vid.readyState>=2){startLoop();}
     else{vid.addEventListener("loadeddata",startLoop,{once:true});vid.addEventListener("canplay",startLoop,{once:true});vid.addEventListener("playing",startLoop,{once:true});}
 
-    // ── AUTOPLAY + AUDIO UNLOCK ────────────────────────────
+    // -- AUTOPLAY + AUDIO UNLOCK ----------------------------
     // Default: muted=true (sampai user aktifkan)
     // Popup "click anywhere to unmute" muncul jika audio pernah ON
     // dan hilang saat user klik atau setelah 5 detik
@@ -51,14 +51,14 @@
     var MUTE_KEY  = 'ft_bg_muted';
     var PANEL_KEY = 'ft_panel_hidden';
 
-    // Pertama kali install → null → default muted
+    // Pertama kali install -> null -> default muted
     var isMuted       = localStorage.getItem(MUTE_KEY)  !== 'false';
     var isPanelHidden = localStorage.getItem(PANEL_KEY) === 'true';
 
     function startVideo(){
         vid.muted = true; // selalu start muted agar autoplay tidak diblokir
         vid.play().catch(function(){
-            // Benar-benar diblokir — tunggu interaksi apapun
+            // Benar-benar diblokir - tunggu interaksi apapun
             ['click','touchstart','keydown'].forEach(function(e){
                 document.addEventListener(e, function once(){
                     document.removeEventListener(e, once);
@@ -122,7 +122,7 @@
                 vid.muted = false;
                 isMuted = false;
                 localStorage.setItem(MUTE_KEY, 'false');
-                // Set flag hanya di router page — di login page tidak perlu
+                // Set flag hanya di router page - di login page tidak perlu
                 var isLoginPage = window.location.pathname.indexOf('login') !== -1;
                 if(!isLoginPage) sessionStorage.setItem('ft_session_unmuted', '1');
                 // Sync tombol mute jika sudah ada
@@ -131,13 +131,13 @@
             }
         }
 
-        // Klik popup sendiri → unmute
+        // Klik popup sendiri -> unmute
         popup.addEventListener('click', function(e){
             e.stopPropagation();
             dismissPopup(true);
         });
 
-        // Klik di mana saja → unmute
+        // Klik di mana saja -> unmute
         document.addEventListener('click', function onAnyClick(){
             document.removeEventListener('click', onAnyClick);
             dismissPopup(true);
@@ -168,7 +168,7 @@
     }
     insertVideo();
 
-    // ── CONTROLS (proximity 80px, pojok kanan bawah) ───────
+    // -- CONTROLS (proximity 80px, pojok kanan bawah) -------
     var TRIGGER_RADIUS = 80;
 
     var cStyle = document.createElement('style');
@@ -245,7 +245,7 @@
     if(document.body) attachControls();
     else document.addEventListener('DOMContentLoaded', attachControls);
 
-    // ── ONBOARDING TIP: HIDE PANEL (pertama kali login) ─────
+    // -- ONBOARDING TIP: HIDE PANEL (pertama kali login) -----
     // Login.html set sessionStorage 'ft_show_panel_tip' saat first login
     if(sessionStorage.getItem('ft_show_panel_tip')){
         sessionStorage.removeItem('ft_show_panel_tip');
