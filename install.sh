@@ -490,23 +490,6 @@ http {
             try_files \$uri =404;
         }
 
-        # tomato.cgi — proxy dengan sub_filter untuk inject video bg di halaman reboot
-        location = /tomato.cgi {
-            proxy_pass http://$LAN_IP:8008;
-            proxy_set_header Authorization \$auth_header;
-            proxy_set_header Host \$host;
-            proxy_set_header X-Real-IP \$remote_addr;
-            proxy_http_version 1.1;
-            proxy_set_header Connection "";
-            proxy_buffering on;
-
-            # Inject video background sebelum </body>
-            # sub_filter hanya aktif jika teks cocok (halaman reboot)
-            sub_filter '</body>' '<video id="ft-rbv" autoplay loop muted playsinline style="position:fixed;inset:0;width:100vw;height:100vh;object-fit:cover;z-index:0;pointer-events:none"><source src="/bgmp4.gif" type="video/mp4"></video><div id="ft-rbo" style="position:fixed;inset:0;z-index:1;background:rgba(8,6,10,.5)"></div><script src="/ft-reboot-adapt.js"></script></body>';
-            sub_filter_once on;
-            sub_filter_types text/html;
-        }
-
         # Static files
         location ~* \.(css|js|png|jpg|jpeg|ico|svg|woff|woff2|html)$ {
             try_files \$uri @proxy;
