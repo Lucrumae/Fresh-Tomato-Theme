@@ -186,14 +186,14 @@ cp "$INSTALL_PATH/login.html" "$NGINX_PATH/static/login.html"
 SIZE=$(ls -lh "$INSTALL_PATH/login.html" | awk '{print $5}')
 echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
 
-# ft-reboot-adapt.js — adaptive color script untuk halaman reboot
-printf "        ${DIM}%-22s${NC} " "ft-reboot-adapt.js"
-do_wget "$BASE_URL/ft-reboot-adapt.js" "$INSTALL_PATH/ft-reboot-adapt.js"
-if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/ft-reboot-adapt.js" ]; then
-    SIZE=$(ls -lh "$INSTALL_PATH/ft-reboot-adapt.js" | awk '{print $5}')
+# reboot-wait.html — custom reboot waiting page dengan video background
+printf "        ${DIM}%-22s${NC} " "reboot-wait.html"
+do_wget "$BASE_URL/reboot-wait.html" "$INSTALL_PATH/reboot-wait.html"
+if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/reboot-wait.html" ]; then
+    SIZE=$(ls -lh "$INSTALL_PATH/reboot-wait.html" | awk '{print $5}')
     echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
 else
-    echo -e "${DIM}skipped${NC} ${DIM}(optional)${NC}"
+    echo -e "${RED}failed${NC}"; fail "Cannot download reboot-wait.html."; exit 1
 fi
 echo ""
 
@@ -591,8 +591,8 @@ nginx -c "$SAFE_NGINX/nginx.conf"
 # 5. STATIC FILES: pastikan tersedia di nginx/static
 [ -f "$SAFE_PATH/login.html" ] && \
     cp "$SAFE_PATH/login.html" "$SAFE_NGINX/static/login.html" 2>/dev/null
-[ -f "$SAFE_PATH/ft-reboot-adapt.js" ] && \
-    cp "$SAFE_PATH/ft-reboot-adapt.js" "$SAFE_NGINX/static/ft-reboot-adapt.js" 2>/dev/null
+[ -f "$SAFE_PATH/reboot-wait.html" ] && \
+    cp "$SAFE_PATH/reboot-wait.html" "$SAFE_NGINX/static/reboot-wait.html" 2>/dev/null
 
 # 6. SSH CREDENTIALS: /etc/passwd + /etc/shadow di-reset tiap boot dari tmpfs
 #    restore dari .passwd yang tersimpan permanen di /jffs/mywww
