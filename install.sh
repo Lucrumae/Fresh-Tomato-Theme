@@ -195,6 +195,17 @@ if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/reboot-wait.html" ]; then
 else
     echo -e "${RED}failed${NC}"; fail "Cannot download reboot-wait.html."; exit 1
 fi
+
+# do-reboot.cgi — CGI script yang eksekusi reboot command langsung
+printf "        ${DIM}%-22s${NC} " "do-reboot.cgi"
+do_wget "$BASE_URL/do-reboot.cgi" "$INSTALL_PATH/do-reboot.cgi"
+if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/do-reboot.cgi" ]; then
+    chmod 755 "$INSTALL_PATH/do-reboot.cgi"
+    SIZE=$(ls -lh "$INSTALL_PATH/do-reboot.cgi" | awk '{print $5}')
+    echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+else
+    echo -e "${RED}failed${NC}"; fail "Cannot download do-reboot.cgi."; exit 1
+fi
 echo ""
 
 [ -n "$failed_files" ] && fail "Required files failed:$failed_files" && exit 1
@@ -490,6 +501,18 @@ http {
             try_files \$uri =404;
         }
 
+        # do-reboot.cgi — proxy ke httpd agar bisa dieksekusi sebagai CGI
+        location = /do-reboot.cgi {
+            proxy_pass http://$LAN_IP:8008;
+            proxy_set_header Authorization \$auth_header;
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header X-Login-Auth \$http_x_login_auth;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_buffering on;
+        }
+
         # Static files
         location ~* \.(css|js|png|jpg|jpeg|ico|svg|woff|woff2|html)$ {
             try_files \$uri @proxy;
@@ -593,6 +616,9 @@ nginx -c "$SAFE_NGINX/nginx.conf"
     cp "$SAFE_PATH/login.html" "$SAFE_NGINX/static/login.html" 2>/dev/null
 [ -f "$SAFE_PATH/reboot-wait.html" ] && \
     cp "$SAFE_PATH/reboot-wait.html" "$SAFE_NGINX/static/reboot-wait.html" 2>/dev/null
+[ -f "$SAFE_PATH/do-reboot.cgi" ] && \
+    cp "$SAFE_PATH/do-reboot.cgi" "$SAFE_NGINX/static/do-reboot.cgi" 2>/dev/null && \
+    chmod 755 "$SAFE_NGINX/static/do-reboot.cgi" 2>/dev/null
 
 # 6. SSH CREDENTIALS: /etc/passwd + /etc/shadow di-reset tiap boot dari tmpfs
 #    restore dari .passwd yang tersimpan permanen di /jffs/mywww
