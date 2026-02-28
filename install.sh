@@ -498,43 +498,73 @@ case "$use_current" in
 
         # Update SSH + system credentials
         # ── Fungsi apply SSH credentials ──────────────────────────
+        # Fungsi generate password hash tanpa passwd command
+        make_hash() {
+            local pass="$1"
+            local hash=""
+            # Coba openssl dulu
+            hash=$(openssl passwd -1 "$pass" 2>/dev/null)
+            # Fallback ke MD5 via busybox
+            [ -z "$hash" ] && hash=$(echo "$pass" | md5sum 2>/dev/null | awk "{print \$1}")
+            echo "$hash"
+        }
+
+        # Fungsi update /etc/shadow langsung (tidak butuh passwd command)
+        set_shadow_pass() {
+            local uname="$1"
+            local upass="$2"
+            local hash
+            hash=$(make_hash "$upass")
+            [ -z "$hash" ] && return 1
+            # Hapus entry lama, tulis baru
+            grep -v "^${uname}:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
+            echo "${uname}:${hash}:18000:0:99999:7:::" >> /tmp/shadow.tmp
+            cp /tmp/shadow.tmp /etc/shadow
+        }
+
         setup_ssh_user() {
             local uname="$1"
             local upass="$2"
 
-            # Selalu update password root
-            printf "%s\n%s\n" "$upass" "$upass" | passwd root >/dev/null 2>&1
+            # Pastikan SSH password auth aktif
+            nvram set sshd_enable=1
+            nvram set sshd_pass=1
+            nvram commit >/dev/null 2>&1
+            service sshd restart >/dev/null 2>&1
+
+            # Update password root di shadow
+            set_shadow_pass "root" "$upass"
 
             if [ "$uname" = "root" ]; then
+                # Pastikan root shell kembali ke /bin/sh
+                awk 'BEGIN{FS=OFS=":"} /^root:/{$7="/bin/sh"} {print}'                     /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
                 ok "SSH password updated for '${WHITE}root${NC}'"
                 SSH_CUSTOM_USER=""
                 return
             fi
 
-            # Cek apakah /etc/passwd writable
+            # Cek writable
             if ! touch /etc/passwd 2>/dev/null; then
                 warn "/etc/passwd is read-only — SSH custom user cannot be created."
-                warn "Web login will use '${uname}', SSH will use 'root'."
+                warn "Web login will use '${uname}', SSH falls back to 'root'."
                 SSH_CUSTOM_USER=""
                 return
             fi
 
-            # Hapus entry lama jika ada (BusyBox-safe: grep + tmp file)
+            # Hapus entry lama
             grep -v "^${uname}:" /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
-            grep -v "^${uname}:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null && cp /tmp/shadow.tmp /etc/shadow 2>/dev/null
 
             # Tambah user custom UID 0
             echo "${uname}:x:0:0::/root:/bin/sh" >> /etc/passwd
 
-            # Set password
-            printf "%s\n%s\n" "$upass" "$upass" | passwd "$uname" >/dev/null 2>&1
+            # Set password di shadow
+            set_shadow_pass "$uname" "$upass"
 
-            # Disable root SSH: ganti shell root ke /bin/false
-            # BusyBox-safe: gunakan awk bukan sed dengan pipe
-            awk 'BEGIN{FS=OFS=":"} /^root:/{$7="/bin/false"} {print}' /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
+            # Block root SSH: ganti shell ke /bin/false
+            awk 'BEGIN{FS=OFS=":"} /^root:/{$7="/bin/false"} {print}'                 /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
 
             ok "SSH user '${WHITE}${uname}${NC}' created → UID 0 (runs as root)"
-            ok "SSH login for 'root' blocked → shell changed to /bin/false"
+            ok "SSH login for 'root' blocked → shell set to /bin/false"
             SSH_CUSTOM_USER="$uname"
         }
 
@@ -749,33 +779,66 @@ NGINXEOF
     mount --bind "$INSTALL_PATH" /www
     service httpd restart >/dev/null 2>&1
 
-    BOOT_HOOK="# --- Theme Startup ---
-sleep 10
-[ -d $SAFE_PATH ] || exit 0
-mount | grep -q $SAFE_PATH || mount --bind $SAFE_PATH /www
-grep -q $SAFE_SCRIPT $SAFE_PATH/tomato.js 2>/dev/null || echo 'document.addEventListener(\"DOMContentLoaded\",function(){var s=document.createElement(\"script\");s.src=\"/$SAFE_SCRIPT\";document.head.appendChild(s);});' >> $SAFE_PATH/tomato.js
+    # Tulis boot script sebagai file (menghindari masalah quoting di NVRAM)
+    cat > "$NGINX_PATH/boot.sh" << 'BOOTEOF'
+#!/bin/sh
+SAFE_PATH=/jffs/mywww
+SAFE_NGINX=/jffs/nginx
+BOOTEOF
+
+    # Append bagian yang butuh variable expansion
+    cat >> "$NGINX_PATH/boot.sh" << BOOTEOF2
+SAFE_SCRIPT=$SAFE_SCRIPT
+BOOTEOF2
+
+    cat >> "$NGINX_PATH/boot.sh" << 'BOOTEOF3'
+[ -d "$SAFE_PATH" ] || exit 0
+mount | grep -q "$SAFE_PATH" || mount --bind "$SAFE_PATH" /www
+grep -q "$SAFE_SCRIPT" "$SAFE_PATH/tomato.js" 2>/dev/null ||     echo "document.addEventListener("DOMContentLoaded",function(){var s=document.createElement("script");s.src="/$SAFE_SCRIPT";document.head.appendChild(s);});" >> "$SAFE_PATH/tomato.js"
 nvram set http_lanport=8008
 service httpd restart
 sleep 2
 mkdir -p /var/log/nginx /var/lib/nginx/client /var/lib/nginx/proxy
-PORT80_PID=\$(netstat -tlnp 2>/dev/null | grep ':80 ' | awk '{print \$7}' | cut -d/ -f1 | head -1)
-[ -n "\$PORT80_PID" ] && kill -9 "\$PORT80_PID" 2>/dev/null && sleep 1
+PORT80_PID=$(netstat -tlnp 2>/dev/null | grep ':80 ' | awk '{print $7}' | cut -d/ -f1 | head -1)
+[ -n "$PORT80_PID" ] && kill -9 "$PORT80_PID" 2>/dev/null && sleep 1
 pkill -9 nginx 2>/dev/null
-kill -9 \$(cat /tmp/nginx.pid 2>/dev/null) 2>/dev/null
+kill -9 $(cat /tmp/nginx.pid 2>/dev/null) 2>/dev/null
 rm -f /tmp/nginx.pid 2>/dev/null
 sleep 2
-nginx -c $SAFE_NGINX/nginx.conf
+nginx -c "$SAFE_NGINX/nginx.conf"
 # Re-apply SSH credentials on boot
-_F=$SAFE_PATH/.passwd
-_U=$(cut -d: -f1 $_F 2>/dev/null)
-_P=$(cut -d: -f2- $_F 2>/dev/null)
-[ -n "$_P" ] && printf "%s\n%s\n" "$_P" "$_P" | passwd root >/dev/null 2>&1
-if [ -n "$_U" ] && [ "$_U" != "root" ]; then
-    grep -v "^${_U}:" /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
-    echo "${_U}:x:0:0::/root:/bin/sh" >> /etc/passwd
-    [ -n "$_P" ] && printf "%s\n%s\n" "$_P" "$_P" | passwd "$_U" >/dev/null 2>&1
-    awk 'BEGIN{FS=OFS=":"} /^root:/{$7="/bin/false"} {print}' /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
+_F="$SAFE_PATH/.passwd"
+_U=$(cut -d: -f1 "$_F" 2>/dev/null)
+_P=$(cut -d: -f2- "$_F" 2>/dev/null)
+if [ -n "$_P" ]; then
+    # Generate hash dan tulis ke shadow (passwd command tidak ada di FreshTomato)
+    _H=$(openssl passwd -1 "$_P" 2>/dev/null)
+    if [ -n "$_H" ]; then
+        grep -v "^root:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
+        echo "root:${_H}:18000:0:99999:7:::" >> /tmp/shadow.tmp
+        cp /tmp/shadow.tmp /etc/shadow
+    fi
+    if [ -n "$_U" ] && [ "$_U" != "root" ]; then
+        # Re-create custom user
+        grep -v "^${_U}:" /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
+        echo "${_U}:x:0:0::/root:/bin/sh" >> /etc/passwd
+        # Set password di shadow
+        _UH=$(openssl passwd -1 "$_P" 2>/dev/null)
+        if [ -n "$_UH" ]; then
+            grep -v "^${_U}:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
+            echo "${_U}:${_UH}:18000:0:99999:7:::" >> /tmp/shadow.tmp
+            cp /tmp/shadow.tmp /etc/shadow
+        fi
+        # Block root SSH
+        awk 'BEGIN{FS=OFS=":"} /^root:/{$7="/bin/false"} {print}' /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
+    fi
 fi
+BOOTEOF3
+    chmod 755 "$NGINX_PATH/boot.sh"
+
+    BOOT_HOOK="# --- Theme Startup ---
+sleep 10
+sh $SAFE_NGINX/boot.sh
 # --- End Theme Startup ---"
 
     LOGIN_STATUS="${BGREEN}Custom login page (nginx)${NC}"
