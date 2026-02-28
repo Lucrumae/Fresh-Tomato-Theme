@@ -526,11 +526,10 @@ case "$use_current" in
             local uname="$1"
             local upass="$2"
 
-            # Pastikan SSH password auth aktif
+            # Tandai untuk restart SSH di akhir script (agar koneksi tidak putus)
             nvram set sshd_enable=1
             nvram set sshd_pass=1
-            nvram commit >/dev/null 2>&1
-            service sshd restart >/dev/null 2>&1
+            SSHD_NEEDS_RESTART=1
 
             # Update password root di shadow
             set_shadow_pass "root" "$upass"
@@ -873,6 +872,12 @@ echo -e "${BGREEN}done${NC}"
 # =================================================================
 # DONE
 # =================================================================
+# Restart sshd di akhir — setelah semua selesai agar koneksi tidak putus di tengah install
+if [ "${SSHD_NEEDS_RESTART:-0}" = "1" ]; then
+    nvram commit >/dev/null 2>&1
+    service sshd restart >/dev/null 2>&1
+fi
+
 echo ""; divider; echo ""
 echo -e "  ${BGREEN}✔  Installation complete!${NC}"; echo ""
 echo -e "  ${WHITE}Theme   ${NC}${PINK}$SELECTED_NAME${NC}"
