@@ -122,6 +122,8 @@
                 vid.muted = false;
                 isMuted = false;
                 localStorage.setItem(MUTE_KEY, 'false');
+                // Tandai sudah unmute di session ini → popup tidak muncul lagi saat navigasi
+                sessionStorage.setItem('ft_session_unmuted', '1');
                 // Sync tombol mute jika sudah ada
                 var btn = document.getElementById('ft-btn-mute');
                 if(btn && typeof applyMute === 'function') applyMute(false);
@@ -151,10 +153,12 @@
         function doInsert(){
             document.body.insertBefore(vid, document.body.firstChild);
             startVideo();
-            // Tampilkan popup setelah DOM siap
-            // Hanya jika audio pernah ON sebelumnya
-            if(localStorage.getItem(MUTE_KEY) === 'false'){
-                // Tunggu sebentar agar halaman selesai render
+            // Popup hanya muncul jika audio pernah di-unmute (localStorage)
+            // DAN belum pernah muncul di session ini (sessionStorage).
+            // Mencegah popup muncul terus saat navigasi antar halaman
+            // selama audio masih berjalan.
+            if(localStorage.getItem(MUTE_KEY) === 'false' &&
+               !sessionStorage.getItem('ft_session_unmuted')){
                 setTimeout(showUnmutePopup, 600);
             }
         }
@@ -207,13 +211,17 @@
         localStorage.setItem(MUTE_KEY, muted ? 'true' : 'false');
         btnMute.innerHTML = muted ? icons.muted : icons.unmuted;
         btnMute.title     = muted ? 'Unmute' : 'Mute';
-        // Tutup popup jika user mute via tombol
         if(muted){
+            // Reset session flag saat mute — popup boleh muncul lagi jika user unmute lagi
+            sessionStorage.removeItem('ft_session_unmuted');
             var p = document.getElementById('ft-unmute-popup');
             if(p && p.parentNode){
                 p.classList.add('ft-popup-out');
                 setTimeout(function(){ if(p.parentNode) p.parentNode.removeChild(p); }, 300);
             }
+        } else {
+            // Tandai sudah unmute di session ini
+            sessionStorage.setItem('ft_session_unmuted', '1');
         }
     }
     btnMute.addEventListener('click', function(){ applyMute(!isMuted); });
