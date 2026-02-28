@@ -218,4 +218,58 @@
     if(document.body) attachControls();
     else document.addEventListener('DOMContentLoaded', attachControls);
 
+    // ── ONBOARDING TIP: HIDE PANEL (pertama kali login) ─────
+    // Login.html set sessionStorage 'ft_show_panel_tip' saat first login
+    if(sessionStorage.getItem('ft_show_panel_tip')){
+        sessionStorage.removeItem('ft_show_panel_tip');
+        setTimeout(function(){
+            // Pastikan controls sudah ada di DOM
+            var ctrl = document.getElementById('ft-controls');
+            var bPanel = document.getElementById('ft-controls') &&
+                         document.getElementById('ft-controls').querySelector('button:first-child');
+            if(!ctrl) return;
+
+            // Buat tooltip
+            var tipStyle = document.createElement('style');
+            tipStyle.textContent =
+                '#ft-panel-tip{position:fixed;bottom:60px;right:16px;z-index:10000;' +
+                'background:rgba(10,10,10,0.90);backdrop-filter:blur(12px);' +
+                '-webkit-backdrop-filter:blur(12px);color:#fff;font-size:12px;' +
+                'font-family:sans-serif;padding:10px 14px;border-radius:12px;' +
+                'box-shadow:0 4px 20px rgba(0,0,0,0.5);max-width:200px;' +
+                'line-height:1.6;pointer-events:auto;cursor:pointer;' +
+                'animation:ftTipIn 0.3s ease;}' +
+                '#ft-panel-tip::after{content:"";position:absolute;bottom:-4px;right:18px;' +
+                'width:8px;height:8px;background:rgba(10,10,10,0.90);transform:rotate(45deg);}' +
+                '@keyframes ftTipIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}' +
+                '.ft-tip-pulse{animation:ftPulse 1.2s ease infinite!important;}' +
+                '@keyframes ftPulse{0%,100%{box-shadow:0 2px 8px rgba(0,0,0,0.4);}' +
+                '50%{box-shadow:0 0 0 4px rgba(255,255,255,0.25),0 2px 8px rgba(0,0,0,0.4);}}';
+            document.head.appendChild(tipStyle);
+
+            var tip = document.createElement('div');
+            tip.id = 'ft-panel-tip';
+            tip.innerHTML = '👁 <b>Tip:</b> Move cursor to the<br>bottom-right corner to show<br>controls. Click <b>hide</b> to toggle<br>the navigation panel.';
+            document.body.appendChild(tip);
+
+            // Highlight tombol panel
+            ctrl.classList.add('visible');
+            var bFirst = ctrl.querySelector('button:first-child');
+            if(bFirst) bFirst.classList.add('ft-tip-pulse');
+
+            function removeTip(){
+                tip.style.transition = 'opacity 0.3s ease';
+                tip.style.opacity = '0';
+                setTimeout(function(){
+                    tip.parentNode && tip.parentNode.removeChild(tip);
+                    tipStyle.parentNode && tipStyle.parentNode.removeChild(tipStyle);
+                }, 320);
+                ctrl.classList.remove('visible');
+                if(bFirst) bFirst.classList.remove('ft-tip-pulse');
+            }
+            tip.addEventListener('click', removeTip);
+            setTimeout(removeTip, 8000);
+        }, 1200);
+    }
+
 })();
