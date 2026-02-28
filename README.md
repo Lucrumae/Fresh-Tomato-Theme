@@ -18,16 +18,6 @@
 <table>
   <tr>
     <td align="center">
-      <b>⬜ Material White</b><br>
-      <img src="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/MaterialWhite/preview.png" width="400">
-    </td>
-    <td align="center">
-      <b>⬛ Material Black</b><br>
-      <img src="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/MaterialBlack/preview.png" width="400">
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
       <b>🐈 Sleeping Cat</b><br>
       <img src="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/SleepingCat/preview.png" width="400">
     </td>
@@ -43,6 +33,23 @@
 **Adaptive** reads the colors from your uploaded `bgmp4.gif` on load and applies them to the panel UI.
 
 **Adaptive Realtime** continuously samples the video frame-by-frame and shifts panel colors in real time as the video plays.
+
+---
+
+## ✨ Login Page Preview
+
+<table>
+  <tr>
+    <td align="center">
+      <b>🐈 Sleeping Cat</b><br>
+      <img src="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/SleepingCat/preview.png" width="400">
+    </td>
+    <td align="center">
+      <b>🎸 Bocchi The Rock</b><br>
+      <img src="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme/BocchiTheRock/preview.png" width="400">
+    </td>
+  </tr>
+</table>
 
 ---
 
