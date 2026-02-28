@@ -36,16 +36,16 @@
 
 ---
 
-## ✨ Login Page Preview
+## 📩 Login Page Preview
 
 <table>
   <tr>
     <td align="center">
-      <b>🐈 Sleeping Cat</b><br>
+      <b>🍭 Adaptive Theme</b><br>
       <img src="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Preview/login1.png" width="400">
     </td>
     <td align="center">
-      <b>🎸 Bocchi The Rock</b><br>
+      <b>👾 Aemeath Wuthering Waves</b><br>
       <img src="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Preview/login2.png" width="400">
     </td>
   </tr>
