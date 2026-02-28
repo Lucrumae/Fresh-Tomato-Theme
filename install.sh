@@ -455,30 +455,45 @@ HTTP_USER=$(nvram get http_username)
 HTTP_PASS=$(nvram get http_passwd)
 
 echo ""
-echo -e "  ${CYAN}Login Credentials${NC}"
-echo -e "  ${DIM}────────────────────────────────────────────────${NC}"
-echo -e "  Current: ${DIM}${HTTP_USER} / ${HTTP_PASS}${NC}"
 echo ""
-printf "  Use current credentials? (y/n): "; read use_current < /dev/tty; echo ""
+echo -e "  ${WHITE}Login Credentials${NC}"
+divider
+echo -e "  ${DIM}The login page will use these credentials to authenticate${NC}"
+echo -e "  ${DIM}access to your router. Choosing [n] lets you set a custom${NC}"
+echo -e "  ${DIM}username and password — this will also update the router's${NC}"
+echo -e "  ${DIM}built-in admin credentials (http_username / http_passwd).${NC}"
+echo ""
+echo -e "  Detected credentials  ${DIM}→${NC}  ${WHITE}${HTTP_USER}${NC} / ${DIM}${HTTP_PASS}${NC}"
+echo ""
+printf "  Keep current credentials? [y/n]: "; read use_current < /dev/tty; echo ""
 
 case "$use_current" in
     n|N)
-        printf "  New username [${HTTP_USER}]: "; read new_user < /dev/tty
+        echo -e "  ${CYAN}Set new credentials${NC}"
+        divider
+        printf "  Username ${DIM}[leave blank to keep '${HTTP_USER}']${NC}: "
+        read new_user < /dev/tty
         [ -z "$new_user" ] && new_user="$HTTP_USER"
-        printf "  New password: "; read new_pass < /dev/tty; echo ""
+
+        printf "  Password ${DIM}[leave blank to keep current]${NC}: "
+        read new_pass < /dev/tty; echo ""
+
         if [ -z "$new_pass" ]; then
-            echo -e "  ${YELLOW}⚠${NC}  Password kosong, pakai password saat ini."
+            warn "No password entered — keeping current password."
             new_pass="$HTTP_PASS"
         fi
+
         HTTP_USER="$new_user"
         HTTP_PASS="$new_pass"
         nvram set http_username="$HTTP_USER"
         nvram set http_passwd="$HTTP_PASS"
-        nvram commit
-        echo -e "  ${BGREEN}✔${NC}  Credentials updated: ${HTTP_USER}"
+        nvram commit >/dev/null 2>&1
+
+        echo ""
+        ok "Credentials updated  →  ${WHITE}${HTTP_USER}${NC} / ${DIM}${HTTP_PASS}${NC}"
         ;;
     *)
-        echo -e "  ${BGREEN}✔${NC}  Using current credentials: ${HTTP_USER}"
+        ok "Keeping current credentials  →  ${WHITE}${HTTP_USER}${NC}"
         ;;
 esac
 echo ""
