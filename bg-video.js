@@ -95,8 +95,9 @@
                 vid.muted = false;
                 isMuted = false;
                 localStorage.setItem(MUTE_KEY, 'false');
-                // Tandai sudah unmute di session ini → popup tidak muncul lagi saat navigasi
-                sessionStorage.setItem('ft_session_unmuted', '1');
+                // Set flag hanya di router page — di login page tidak perlu
+                var isLoginPage = window.location.pathname.indexOf('login') !== -1;
+                if(!isLoginPage) sessionStorage.setItem('ft_session_unmuted', '1');
                 // Sync tombol mute jika sudah ada
                 var btn = document.getElementById('ft-btn-mute');
                 if(btn && typeof applyMute === 'function') applyMute(false);
@@ -126,12 +127,12 @@
         function doInsert(){
             document.body.insertBefore(vid, document.body.firstChild);
             startVideo();
-            // Popup hanya muncul jika audio pernah di-unmute (localStorage)
-            // DAN belum pernah muncul di session ini (sessionStorage).
-            // Mencegah popup muncul terus saat navigasi antar halaman
-            // selama audio masih berjalan.
+            // Popup muncul jika audio pernah di-unmute (localStorage) DAN:
+            // - Di login page: selalu muncul (setiap refresh)
+            // - Di router page: hanya muncul sekali per session (tidak muncul saat ganti menu)
+            var isLoginPage = window.location.pathname.indexOf('login') !== -1;
             if(localStorage.getItem(MUTE_KEY) === 'false' &&
-               !sessionStorage.getItem('ft_session_unmuted')){
+               (isLoginPage || !sessionStorage.getItem('ft_session_unmuted'))){
                 setTimeout(showUnmutePopup, 600);
             }
         }
@@ -185,7 +186,7 @@
         btnMute.innerHTML = muted ? icons.muted : icons.unmuted;
         btnMute.title     = muted ? 'Unmute' : 'Mute';
         if(muted){
-            // Reset session flag saat mute — popup boleh muncul lagi jika user unmute lagi
+            // Reset flag saat mute agar popup bisa muncul lagi jika unmute lagi
             sessionStorage.removeItem('ft_session_unmuted');
             var p = document.getElementById('ft-unmute-popup');
             if(p && p.parentNode){
@@ -193,8 +194,9 @@
                 setTimeout(function(){ if(p.parentNode) p.parentNode.removeChild(p); }, 300);
             }
         } else {
-            // Tandai sudah unmute di session ini
-            sessionStorage.setItem('ft_session_unmuted', '1');
+            // Set flag hanya di router page
+            var isLoginPage = window.location.pathname.indexOf('login') !== -1;
+            if(!isLoginPage) sessionStorage.setItem('ft_session_unmuted', '1');
         }
     }
     btnMute.addEventListener('click', function(){ applyMute(!isMuted); });
