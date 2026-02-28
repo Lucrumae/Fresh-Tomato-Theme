@@ -450,9 +450,39 @@ SAFE_PATH=$(echo "$INSTALL_PATH" | tr -cd 'a-zA-Z0-9/_-')
 SAFE_SCRIPT=$(echo "$VIDEO_SCRIPT" | tr -cd 'a-zA-Z0-9/_.-')
 SAFE_NGINX=$(echo "$NGINX_PATH" | tr -cd 'a-zA-Z0-9/_-')
 
-# Simpan credentials
+# Kredensial — tanya user mau pakai yang sekarang atau custom
 HTTP_USER=$(nvram get http_username)
 HTTP_PASS=$(nvram get http_passwd)
+
+echo ""
+echo -e "  ${CYAN}Login Credentials${NC}"
+echo -e "  ${DIM}────────────────────────────────────────────────${NC}"
+echo -e "  Current: ${DIM}${HTTP_USER} / ${HTTP_PASS}${NC}"
+echo ""
+printf "  Use current credentials? (y/n): "; read use_current < /dev/tty; echo ""
+
+case "$use_current" in
+    n|N)
+        printf "  New username [${HTTP_USER}]: "; read new_user < /dev/tty
+        [ -z "$new_user" ] && new_user="$HTTP_USER"
+        printf "  New password: "; read new_pass < /dev/tty; echo ""
+        if [ -z "$new_pass" ]; then
+            echo -e "  ${YELLOW}⚠${NC}  Password kosong, pakai password saat ini."
+            new_pass="$HTTP_PASS"
+        fi
+        HTTP_USER="$new_user"
+        HTTP_PASS="$new_pass"
+        nvram set http_username="$HTTP_USER"
+        nvram set http_passwd="$HTTP_PASS"
+        nvram commit
+        echo -e "  ${BGREEN}✔${NC}  Credentials updated: ${HTTP_USER}"
+        ;;
+    *)
+        echo -e "  ${BGREEN}✔${NC}  Using current credentials: ${HTTP_USER}"
+        ;;
+esac
+echo ""
+
 echo "${HTTP_USER}:${HTTP_PASS}" > "$INSTALL_PATH/.passwd"
 chmod 600 "$INSTALL_PATH/.passwd"
 
