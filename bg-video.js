@@ -440,20 +440,54 @@
         bd.addEventListener('click', close);
     }
 
-    // Jalankan reboot via form POST langsung (bypass confirm)
+    // Baca credentials dari cookie ft_auth yang disimpan login.html
+    function getAuthCred() {
+        var m = document.cookie.match(/(?:^|;\s*)ft_auth=([^;]+)/);
+        return m ? decodeURIComponent(m[1]) : null;
+    }
+
+    // Jalankan reboot:
+    // 1. Kirim POST ke httpd:8008 langsung dengan Authorization header
+    // 2. Navigasi ke /tomato.cgi (reboot waiting page via nginx proxy)
     function doReboot() {
-        var form = document.createElement('form');
-        form.method = 'post'; form.action = '/tomato.cgi';
-        [['_nextpage','admin-reboot.asp'],
-         ['_action','reboot'],
-         ['submit_button','status-overview']
-        ].forEach(function(kv) {
-            var inp = document.createElement('input');
-            inp.type='hidden'; inp.name=kv[0]; inp.value=kv[1];
-            form.appendChild(inp);
-        });
-        document.body.appendChild(form);
-        form.submit();
+        var cred = getAuthCred();
+        var body = '_nextpage=admin-reboot.asp' +
+                   '&_action=reboot' +
+                   '&submit_button=status-overview';
+
+        var headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+        // Kirim langsung ke httpd:8008 dengan Authorization agar bypass nginx auth issue
+        // Ini sama persis dengan yang dilakukan nginx saat proxy request
+        if(cred) headers['Authorization'] = cred;
+
+        // Kirim POST reboot — router akan segera reboot setelah terima request ini
+        // Tidak perlu tunggu response karena router langsung putus
+        if(typeof fetch !== 'undefined') {
+            fetch('http://192.168.1.1:8008/tomato.cgi', {
+                method: 'POST',
+                headers: headers,
+                body: body,
+                // No credentials include — kita set manual
+                mode: 'no-cors' // hindari CORS preflight yang bisa delay
+            }).catch(function(){
+                // Error expected — router reboot = disconnect
+            });
+        } else {
+            // Fallback XHR untuk browser lama
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', 'http://192.168.1.1:8008/tomato.cgi', true);
+            Object.keys(headers).forEach(function(k) {
+                xhr.setRequestHeader(k, headers[k]);
+            });
+            xhr.send(body);
+        }
+
+        // Navigasi ke halaman proxy nginx setelah 300ms
+        // nginx akan forward ke httpd:8008 yang sedang reboot
+        // hasilnya akan tampil halaman "Please wait while the router reboots"
+        setTimeout(function() {
+            window.location.href = '/tomato.cgi';
+        }, 300);
     }
 
     // Patch semua existing & future onclick="...reboot..." elements
