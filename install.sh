@@ -872,12 +872,6 @@ echo -e "${BGREEN}done${NC}"
 # =================================================================
 # DONE
 # =================================================================
-# Restart sshd di akhir — setelah semua selesai agar koneksi tidak putus di tengah install
-if [ "${SSHD_NEEDS_RESTART:-0}" = "1" ]; then
-    nvram commit >/dev/null 2>&1
-    service sshd restart >/dev/null 2>&1
-fi
-
 echo ""; divider; echo ""
 echo -e "  ${BGREEN}✔  Installation complete!${NC}"; echo ""
 echo -e "  ${WHITE}Theme   ${NC}${PINK}$SELECTED_NAME${NC}"
@@ -888,3 +882,18 @@ echo -e "  ${WHITE}Status  ${NC}${BGREEN}Active & persistent${NC}"
 echo ""
 echo -e "  ${YELLOW}⚑  Press Ctrl+F5 to clear browser cache.${NC}"
 echo ""; divider; echo ""
+
+if [ "${SSHD_NEEDS_RESTART:-0}" = "1" ]; then
+    echo -e "  ${YELLOW}⚠  SSH Service Restart${NC}"
+    divider
+    echo -e "  ${DIM}New SSH credentials have been applied. The SSH daemon${NC}"
+    echo -e "  ${DIM}must restart to apply changes — your current session${NC}"
+    echo -e "  ${DIM}will be disconnected in 3 seconds.${NC}"
+    echo ""
+    echo -e "  ${WHITE}Reconnect using:${NC}"
+    echo -e "  ${CYAN}  ssh ${HTTP_USER}@${LAN_IP}${NC}"
+    echo ""; divider; echo ""
+    sleep 3
+    nvram commit >/dev/null 2>&1
+    service sshd restart >/dev/null 2>&1
+fi
