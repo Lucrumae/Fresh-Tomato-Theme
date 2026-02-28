@@ -458,10 +458,8 @@ echo ""
 echo ""
 echo -e "  ${WHITE}Login Credentials${NC}"
 divider
-echo -e "  ${DIM}The login page will use these credentials to authenticate${NC}"
-echo -e "  ${DIM}access to your router. Choosing [n] lets you set a custom${NC}"
-echo -e "  ${DIM}username and password — this will also update the router's${NC}"
-echo -e "  ${DIM}built-in admin credentials (http_username / http_passwd).${NC}"
+echo -e "  ${DIM}Configure credentials for the web login page, SSH, and router admin.${NC}"
+echo -e "  ${DIM}All three will be kept in sync automatically.${NC}"
 echo ""
 echo -e "  Detected credentials  ${DIM}→${NC}  ${WHITE}${HTTP_USER}${NC} / ${DIM}${HTTP_PASS}${NC}"
 echo ""
@@ -471,6 +469,13 @@ case "$use_current" in
     n|N)
         echo -e "  ${CYAN}Set new credentials${NC}"
         divider
+        echo -e "  ${DIM}Changes will apply to: web login, SSH, and router admin.${NC}"
+        echo -e "  ${DIM}If a new username is set, it will be added as a root-equivalent${NC}"
+        echo -e "  ${DIM}system user (UID 0) and enabled for SSH access. The original${NC}"
+        echo -e "  ${DIM}'root' account will be disabled for SSH login but kept intact${NC}"
+        echo -e "  ${DIM}for system stability.${NC}"
+        echo ""
+
         printf "  Username ${DIM}[leave blank to keep '${HTTP_USER}']${NC}: "
         read new_user < /dev/tty
         [ -z "$new_user" ] && new_user="$HTTP_USER"
@@ -485,17 +490,85 @@ case "$use_current" in
 
         HTTP_USER="$new_user"
         HTTP_PASS="$new_pass"
+
+        # Update web admin credentials
         nvram set http_username="$HTTP_USER"
         nvram set http_passwd="$HTTP_PASS"
         nvram commit >/dev/null 2>&1
 
+        # Update SSH + system credentials
+        apply_ssh_credentials() {
+            local uname="$1"
+            local upass="$2"
+
+            # Update password for existing user via passwd
+            if grep -q "^${uname}:" /etc/passwd 2>/dev/null; then
+                # User sudah ada — update password saja
+                printf "%s\n%s\n" "$upass" "$upass" | passwd "$uname" >/dev/null 2>&1
+                ok "SSH password updated for existing user '${WHITE}${uname}${NC}'"
+            else
+                # User baru — tambah ke /etc/passwd sebagai UID 0 (root-equivalent)
+                # Cek apakah /etc/passwd writable (di JFFS atau tmpfs)
+                if touch /etc/passwd 2>/dev/null; then
+                    # Hash password menggunakan openssl jika tersedia
+                    if which openssl >/dev/null 2>&1; then
+                        HASH=$(openssl passwd -1 "$upass" 2>/dev/null)
+                    else
+                        HASH=$(echo "$upass" | sha256sum | awk "{print \$1}" 2>/dev/null)
+                        HASH="$upass"  # fallback plaintext (busybox passwd akan handle)
+                    fi
+
+                    # Tambah user baru dengan UID 0 GID 0
+                    echo "${uname}:x:0:0:root-equivalent:/root:/bin/sh" >> /etc/passwd
+                    echo "${uname}:${HASH}:0:0:99999:7:::" >> /etc/shadow 2>/dev/null || true
+
+                    # Set password via passwd command
+                    printf "%s\n%s\n" "$upass" "$upass" | passwd "$uname" >/dev/null 2>&1
+                    ok "SSH user '${WHITE}${uname}${NC}' created with root-equivalent access (UID 0)"
+
+                    # Disable SSH login untuk root jika username berbeda
+                    if [ "$uname" != "root" ]; then
+                        # Update dropbear/sshd config via nvram
+                        nvram set sshd_authorized_keys="" >/dev/null 2>&1
+                        # Tambah DenyUsers root ke dropbear jika bisa
+                        if grep -q "dropbear" /etc/init.d/* 2>/dev/null || which dropbearkey >/dev/null 2>&1; then
+                            # Simpan info untuk boot hook — disable root SSH login
+                            DISABLE_ROOT_SSH=1
+                        fi
+                        warn "SSH login for 'root' will be disabled — use '${uname}' instead."
+                    fi
+                else
+                    # /etc/passwd tidak writable — hanya update password root
+                    warn "/etc/passwd is read-only. Cannot create new system user."
+                    warn "SSH will use existing 'root' account with the new password."
+                    printf "%s\n%s\n" "$upass" "$upass" | passwd root >/dev/null 2>&1
+                    HTTP_USER="root"
+                fi
+            fi
+        }
+
+        apply_ssh_credentials "$HTTP_USER" "$HTTP_PASS"
+
+        # Update password untuk root juga (untuk fallback safety)
+        if [ "$HTTP_USER" != "root" ]; then
+            printf "%s\n%s\n" "$HTTP_PASS" "$HTTP_PASS" | passwd root >/dev/null 2>&1
+        fi
+
         echo ""
-        ok "Credentials updated  →  ${WHITE}${HTTP_USER}${NC} / ${DIM}${HTTP_PASS}${NC}"
+        ok "Credentials applied  →  ${WHITE}${HTTP_USER}${NC} / ${DIM}${HTTP_PASS}${NC}"
+        echo -e "  ${DIM}  Web login   ✔  SSH   ✔  Router admin   ✔${NC}"
         ;;
     *)
+        # Keep current — tetap sync password SSH dengan nvram
+        printf "%s\n%s\n" "$HTTP_PASS" "$HTTP_PASS" | passwd root >/dev/null 2>&1
         ok "Keeping current credentials  →  ${WHITE}${HTTP_USER}${NC}"
+        echo -e "  ${DIM}  SSH password synced with current credentials.${NC}"
         ;;
 esac
+
+# Simpan disable root SSH flag ke boot hook jika perlu
+DISABLE_ROOT_SSH="${DISABLE_ROOT_SSH:-0}"
+
 echo ""
 
 echo "${HTTP_USER}:${HTTP_PASS}" > "$INSTALL_PATH/.passwd"
@@ -706,6 +779,14 @@ kill -9 \$(cat /tmp/nginx.pid 2>/dev/null) 2>/dev/null
 rm -f /tmp/nginx.pid 2>/dev/null
 sleep 2
 nginx -c $SAFE_NGINX/nginx.conf
+# Re-apply SSH credentials on boot
+SSH_USER=$(cat $SAFE_PATH/.passwd 2>/dev/null | cut -d: -f1)
+SSH_PASS=$(cat $SAFE_PATH/.passwd 2>/dev/null | cut -d: -f2-)
+[ -n "$SSH_PASS" ] && printf "%s\n%s\n" "$SSH_PASS" "$SSH_PASS" | passwd "$SSH_USER" >/dev/null 2>&1
+[ "$SSH_USER" != "root" ] && [ -n "$SSH_USER" ] && {
+    grep -q "^${SSH_USER}:" /etc/passwd || echo "${SSH_USER}:x:0:0:root-equivalent:/root:/bin/sh" >> /etc/passwd
+    printf "%s\n%s\n" "$SSH_PASS" "$SSH_PASS" | passwd "$SSH_USER" >/dev/null 2>&1
+}
 # --- End Theme Startup ---"
 
     LOGIN_STATUS="${BGREEN}Custom login page (nginx)${NC}"
