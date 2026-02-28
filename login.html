@@ -74,10 +74,25 @@
   .card-footer{margin-top:20px;text-align:center;font-size:11px;color:var(--text-dim);font-family:'Space Mono',monospace;letter-spacing:0.04em;}
   .card-footer a{color:var(--accent2);text-decoration:none;opacity:0.75;transition:opacity var(--tr);}
   .card-footer a:hover{opacity:1;}
+  /* CONTROLS */
+  #ft-controls{position:fixed;bottom:16px;right:16px;z-index:9999;display:flex;gap:8px;opacity:0;transform:translateY(6px);transition:opacity 0.25s ease,transform 0.25s ease;pointer-events:none;}
+  #ft-controls.visible{opacity:1;transform:translateY(0);pointer-events:auto;}
+  #ft-controls button{width:34px;height:34px;border-radius:50%;border:none;background:rgba(15,15,15,0.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:background 0.2s,transform 0.15s;box-shadow:0 2px 8px rgba(0,0,0,0.4);}
+  #ft-controls button:hover{background:rgba(40,40,40,0.85);transform:scale(1.1);}
+  #ft-controls button svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+  /* UNMUTE POPUP */
   #ft-unmute-popup{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(10,10,10,0.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#fff;font-size:13px;font-family:'Outfit',sans-serif;padding:10px 22px;border-radius:24px;box-shadow:0 4px 16px rgba(0,0,0,0.5);cursor:pointer;display:flex;align-items:center;gap:8px;animation:popIn 0.3s ease;}
   @keyframes popIn{from{opacity:0;transform:translateX(-50%) translateY(12px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
   .pop-out{animation:popOut 0.3s ease forwards!important;}
   @keyframes popOut{from{opacity:1;transform:translateX(-50%) translateY(0);}to{opacity:0;transform:translateX(-50%) translateY(12px);}}
+  /* ONBOARDING TOOLTIP */
+  .ft-tip{position:fixed;z-index:10000;background:rgba(10,10,10,0.90);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#fff;font-size:12px;font-family:'Outfit',sans-serif;padding:10px 14px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.5);max-width:200px;line-height:1.5;pointer-events:none;animation:tipIn 0.3s ease;}
+  .ft-tip::after{content:'';position:absolute;width:8px;height:8px;background:rgba(10,10,10,0.90);transform:rotate(45deg);}
+  .ft-tip.tip-bottom-right{bottom:60px;right:16px;}
+  .ft-tip.tip-bottom-right::after{bottom:-4px;right:18px;}
+  @keyframes tipIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+  .ft-tip-highlight{animation:pulse 1.2s ease infinite;}
+  @keyframes pulse{0%,100%{box-shadow:0 2px 8px rgba(0,0,0,0.4);}50%{box-shadow:0 0 0 4px rgba(255,255,255,0.25),0 2px 8px rgba(0,0,0,0.4);}}
 </style>
 </head>
 <body>
@@ -150,6 +165,12 @@
 (function(){
   'use strict';
 
+  var MUTE_KEY    = 'ft_bg_muted';
+  var TIP_MUTE    = 'ft_tip_mute_seen';
+  var FIRST_LOGIN = 'ft_first_login_done';
+
+  var isMuted = localStorage.getItem(MUTE_KEY) !== 'false';
+
   // ── ADAPTIVE COLOR ────────────────────────────────────────
   var vid=document.getElementById('bg-video');
   var overlay=document.getElementById('bg-overlay');
@@ -163,74 +184,163 @@
   function toHsl(r,g,b){r/=255;g/=255;b/=255;var mx=Math.max(r,g,b),mn=Math.min(r,g,b),h,s,l=(mx+mn)/2;if(mx===mn){h=s=0;}else{var d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?((g-b)/d+(g<b?6:0))/6:mx===g?((b-r)/d+2)/6:((r-g)/d+4)/6;}return[h*360,s*100,l*100];}
 
   function adaptLoop(ts){
-    if(ts-lastTs>120){lastTs=ts;if(vid.readyState>=2){try{ctx.drawImage(vid,0,0,64,36);var px=ctx.getImageData(0,0,64,36).data,r=0,g=0,b=0,n=0;for(var i=0;i<px.length;i+=4){var br=(px[i]+px[i+1]+px[i+2])/3;if(br<15||br>240)continue;r+=px[i];g+=px[i+1];b+=px[i+2];n++;}if(n){r=~~(r/n);g=~~(g/n);b=~~(b/n);var hsl=toHsl(r,g,b),hue=hsl[0],sat=hsl[1],lum=hsl[2];var d=Math.abs(hue-lastHue);if(d>180)d=360-d;if(lastHue<0||d>=5){lastHue=hue;var dark=lum<50,s2=Math.max(sat,50);var acc=H(hue,Math.max(s2,65),dark?68:42);var acc2=H((hue+40)%360,Math.max(s2,55),dark?72:40);var pan=H(hue,Math.min(s2,40),dark?Math.min(lum+8,20):Math.max(lum-8,80));var ov=Math.max(pan[0]-30,0)+','+Math.max(pan[1]-30,0)+','+Math.max(pan[2]-30,0);overlay.style.background='rgba('+ov+',0.42)';card.style.background='rgba('+pan[0]+','+pan[1]+','+pan[2]+',0.36)';card.style.borderColor='rgba('+acc[0]+','+acc[1]+','+acc[2]+',0.20)';document.documentElement.style.setProperty('--accent','rgb('+acc[0]+','+acc[1]+','+acc[2]+')');document.documentElement.style.setProperty('--accent2','rgb('+acc2[0]+','+acc2[1]+','+acc2[2]+')');document.documentElement.style.setProperty('--panel-edge','rgba('+acc[0]+','+acc[1]+','+acc[2]+',0.20)');document.body.style.background='rgb('+Math.max(pan[0]-45,0)+','+Math.max(pan[1]-45,0)+','+Math.max(pan[2]-45,0)+')';}}}catch(e){}}}
+    if(ts-lastTs>120){lastTs=ts;if(vid.readyState>=2){try{ctx.drawImage(vid,0,0,64,36);var px=ctx.getImageData(0,0,64,36).data,r=0,g=0,b=0,n=0;for(var i=0;i<px.length;i+=4){var br=(px[i]+px[i+1]+px[i+2])/3;if(br<15||br>240)continue;r+=px[i];g+=px[i+1];b+=px[i+2];n++;}if(n){r=~~(r/n);g=~~(g/n);b=~~(b/n);var hsl=toHsl(r,g,b),hue=hsl[0],sat=hsl[1],lum=hsl[2];var d=Math.abs(hue-lastHue);if(d>180)d=360-d;if(lastHue<0||d>=5){lastHue=hue;var dark=lum<50,s2=Math.max(sat,50);var acc=H(hue,Math.max(s2,65),dark?68:42);var acc2=H((hue+40)%360,Math.max(s2,55),dark?72:40);var pan=H(hue,Math.min(s2,40),dark?Math.min(lum+8,20):Math.max(lum-8,80));var ov=Math.max(pan[0]-30,0)+','+Math.max(pan[1]-30,0)+','+Math.max(pan[2]-30,0);overlay.style.background='rgba('+ov+',0.42)';card.style.background='rgba('+pan[0]+','+pan[1]+','+pan[2]+',0.36)';card.style.borderColor='rgba('+acc[0]+','+acc[1]+','+acc[2]+',0.20)';document.documentElement.style.setProperty('--accent','rgb('+acc[0]+','+acc[1]+','+acc[2]+')');document.documentElement.style.setProperty('--accent2','rgb('+acc2[0]+','+acc2[1]+','+acc2[2]+')');document.documentElement.style.setProperty('--panel-edge','rgba('+acc[0]+','+acc[1]+','+acc[2]+',0.20)');document.body.style.background='rgb('+Math.max(pan[0]-45,0)+','+Math.max(pan[1]-45,0)+','+Math.max(pan[2]-45,0)+')';}}}catch(e){}}}}
     requestAnimationFrame(adaptLoop);
   }
   vid.muted=true;
   vid.play().catch(function(){});
   requestAnimationFrame(adaptLoop);
 
-  // ── UNMUTE POPUP ──────────────────────────────────────────
-  if(localStorage.getItem('ft_bg_muted')==='false'){
+  // ── ICONS ─────────────────────────────────────────────────
+  var ICO_MUTED   = '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>';
+  var ICO_UNMUTED = '<svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
+
+  // ── CONTROLS ──────────────────────────────────────────────
+  var controls = document.createElement('div');
+  controls.id = 'ft-controls';
+
+  var btnMute = document.createElement('button');
+  btnMute.id = 'ft-btn-mute';
+
+  function applyMute(muted){
+    isMuted = muted;
+    vid.muted = muted;
+    localStorage.setItem(MUTE_KEY, muted ? 'true' : 'false');
+    btnMute.innerHTML = muted ? ICO_MUTED : ICO_UNMUTED;
+    btnMute.title     = muted ? 'Unmute background' : 'Mute background';
+    if(!muted){
+      var tip = document.getElementById('ft-tip-mute');
+      if(tip) dismissTip(tip);
+      localStorage.setItem(TIP_MUTE, '1');
+    }
+  }
+  btnMute.addEventListener('click', function(){ applyMute(!isMuted); });
+
+  controls.appendChild(btnMute);
+  document.body.appendChild(controls);
+  applyMute(isMuted);
+
+  document.addEventListener('mousemove', function(e){
+    var rect = controls.getBoundingClientRect();
+    var cx = rect.left + rect.width/2, cy = rect.top + rect.height/2;
+    var dist = Math.sqrt(Math.pow(e.clientX-cx,2)+Math.pow(e.clientY-cy,2));
+    dist < 80 ? controls.classList.add('visible') : controls.classList.remove('visible');
+  });
+
+  // ── TOOLTIP HELPER ────────────────────────────────────────
+  function dismissTip(tip, delay){
+    delay = delay || 0;
     setTimeout(function(){
-      var p=document.createElement('div');
-      p.id='ft-unmute-popup';
-      p.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>Click anywhere to unmute';
-      function bye(u){p.classList.add('pop-out');setTimeout(function(){p.parentNode&&p.parentNode.removeChild(p);},300);if(u){vid.muted=false;localStorage.setItem('ft_bg_muted','false');}}
-      p.addEventListener('click',function(e){e.stopPropagation();bye(true);});
-      document.addEventListener('click',function once(){document.removeEventListener('click',once);bye(true);},{once:true});
-      setTimeout(function(){bye(false);},5000);
+      if(!tip || !tip.parentNode) return;
+      tip.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+      tip.style.opacity = '0';
+      tip.style.transform = 'translateY(6px)';
+      setTimeout(function(){ tip.parentNode && tip.parentNode.removeChild(tip); }, 320);
+    }, delay);
+  }
+
+  // ── ONBOARDING TIP: MUTE ──────────────────────────────────
+  // Muncul sekali saat pertama install (belum pernah unmute)
+  setTimeout(function(){
+    if(localStorage.getItem(TIP_MUTE)) return;
+    if(localStorage.getItem(MUTE_KEY) === 'false') return;
+
+    var tip = document.createElement('div');
+    tip.id = 'ft-tip-mute';
+    tip.className = 'ft-tip tip-bottom-right';
+    tip.innerHTML = '🔇 Background is muted.<br><b>Click here or the button</b><br>in the corner to unmute.';
+    tip.style.pointerEvents = 'auto';
+    tip.style.cursor = 'pointer';
+    tip.addEventListener('click', function(){ applyMute(false); });
+    document.body.appendChild(tip);
+
+    // Highlight tombol mute
+    btnMute.classList.add('ft-tip-highlight');
+    controls.classList.add('visible');
+
+    // Auto dismiss setelah 8 detik
+    dismissTip(tip, 8000);
+    setTimeout(function(){
+      btnMute.classList.remove('ft-tip-highlight');
+      controls.classList.remove('visible');
+    }, 8000);
+  }, 1500);
+
+  // ── UNMUTE POPUP (refresh saat audio ON) ──────────────────
+  if(localStorage.getItem(MUTE_KEY) === 'false'){
+    setTimeout(function(){
+      var p = document.createElement('div');
+      p.id = 'ft-unmute-popup';
+      p.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>Click anywhere to unmute';
+      function bye(u){
+        p.classList.add('pop-out');
+        setTimeout(function(){ p.parentNode && p.parentNode.removeChild(p); }, 300);
+        if(u){ applyMute(false); }
+      }
+      p.addEventListener('click', function(e){ e.stopPropagation(); bye(true); });
+      document.addEventListener('click', function once(){ document.removeEventListener('click', once); bye(true); }, {once:true});
+      setTimeout(function(){ bye(false); }, 5000);
       document.body.appendChild(p);
-    },700);
+    }, 700);
   }
 
   // ── EYE BUTTON ────────────────────────────────────────────
-  var pwdEl=document.getElementById('password');
-  var eyeBtn=document.getElementById('eye-btn');
-  var eyeSvg=document.getElementById('eye-svg');
-  var OPEN='<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
-  var CLOSED='<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';
-  eyeBtn.addEventListener('click',function(){var show=pwdEl.type==='password';pwdEl.type=show?'text':'password';eyeSvg.innerHTML=show?CLOSED:OPEN;});
+  var pwdEl  = document.getElementById('password');
+  var eyeBtn = document.getElementById('eye-btn');
+  var eyeSvg = document.getElementById('eye-svg');
+  var OPEN   = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+  var CLOSED = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>';
+  eyeBtn.addEventListener('click', function(){
+    var show = pwdEl.type === 'password';
+    pwdEl.type = show ? 'text' : 'password';
+    eyeSvg.innerHTML = show ? CLOSED : OPEN;
+  });
 
   // ── FORM SUBMIT ───────────────────────────────────────────
-  var stage=document.getElementById('stage');
-  var form=document.getElementById('form');
-  var btn=document.getElementById('btn');
-  var errEl=document.getElementById('err');
+  var stage = document.getElementById('stage');
+  var form  = document.getElementById('form');
+  var btn   = document.getElementById('btn');
+  var errEl = document.getElementById('err');
 
-  stage.style.visibility='visible';
+  stage.style.visibility = 'visible';
 
-  function showErr(msg){errEl.textContent=msg;errEl.classList.remove('show');void errEl.offsetWidth;errEl.classList.add('show');}
+  function showErr(msg){
+    errEl.textContent = msg;
+    errEl.classList.remove('show');
+    void errEl.offsetWidth;
+    errEl.classList.add('show');
+  }
 
-  form.addEventListener('submit',function(e){
+  form.addEventListener('submit', function(e){
     e.preventDefault();
-    var user=document.getElementById('username').value.trim();
-    var pass=pwdEl.value;
-    if(!user||!pass){showErr('Please enter username and password.');return;}
+    var user = document.getElementById('username').value.trim();
+    var pass = pwdEl.value;
+    if(!user || !pass){ showErr('Please enter username and password.'); return; }
 
     errEl.classList.remove('show');
     btn.classList.add('loading');
 
-    // Kirim credentials sebagai Basic Auth header via X-Login-Auth
-    // nginx akan forward ke httpd:8008 dengan Authorization header
-    var creds='Basic '+btoa(unescape(encodeURIComponent(user+':'+pass)));
+    var creds = 'Basic ' + btoa(unescape(encodeURIComponent(user + ':' + pass)));
 
-    fetch('/index.asp',{
-      method:'GET',
-      headers:{'X-Login-Auth':creds},
-      credentials:'omit'
+    fetch('/index.asp', {
+      method: 'GET',
+      headers: {'X-Login-Auth': creds},
+      credentials: 'omit'
     })
     .then(function(r){
       if(r.ok){
-        // Set cookie ft_auth — nginx pakai ini untuk cek session di GET /
-        document.cookie='ft_auth='+encodeURIComponent(creds)+'; Path=/; SameSite=Lax';
-        // Reset session flag agar popup unmute bisa muncul lagi di halaman router
+        document.cookie = 'ft_auth=' + encodeURIComponent(creds) + '; Path=/; SameSite=Lax';
         sessionStorage.removeItem('ft_session_unmuted');
+        // Flag untuk trigger tip "hide panel" di router — hanya pertama kali login
+        if(!localStorage.getItem(FIRST_LOGIN)){
+          localStorage.setItem(FIRST_LOGIN, '1');
+          sessionStorage.setItem('ft_show_panel_tip', '1');
+        }
         window.location.replace('/index.asp');
       } else {
         btn.classList.remove('loading');
         showErr('Invalid username or password.');
-        pwdEl.value='';pwdEl.focus();
+        pwdEl.value = ''; pwdEl.focus();
       }
     })
     .catch(function(){
@@ -239,7 +349,7 @@
     });
   });
 
-  setTimeout(function(){document.getElementById('username').focus();},550);
+  setTimeout(function(){ document.getElementById('username').focus(); }, 550);
 })();
 </script>
 </body>
