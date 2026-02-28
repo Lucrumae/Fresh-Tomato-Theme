@@ -41,7 +41,7 @@
 <table>
   <tr>
     <td align="center">
-      <b>🍭 Adaptive Theme</b><br>
+      <b>🎨 Adaptive Theme</b><br>
       <img src="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Preview/login1.png" width="400">
     </td>
     <td align="center">
