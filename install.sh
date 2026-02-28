@@ -502,43 +502,39 @@ case "$use_current" in
             local uname="$1"
             local upass="$2"
 
-            # Selalu update password root (untuk web admin httpd)
+            # Selalu update password root
             printf "%s\n%s\n" "$upass" "$upass" | passwd root >/dev/null 2>&1
 
             if [ "$uname" = "root" ]; then
-                # Username root — update password SSH root saja
                 ok "SSH password updated for '${WHITE}root${NC}'"
                 SSH_CUSTOM_USER=""
                 return
             fi
 
-            # Username custom → tambah sebagai UID 0 di /etc/passwd
-            # Hapus entry lama jika ada
-            sed -i "/^${uname}:/d" /etc/passwd 2>/dev/null
-            sed -i "/^${uname}:/d" /etc/shadow 2>/dev/null
-
             # Cek apakah /etc/passwd writable
             if ! touch /etc/passwd 2>/dev/null; then
-                warn "/etc/passwd is read-only on this system."
-                warn "SSH custom user cannot be created — using 'root' for SSH."
-                warn "Web login will still use '${uname}'."
+                warn "/etc/passwd is read-only — SSH custom user cannot be created."
+                warn "Web login will use '${uname}', SSH will use 'root'."
                 SSH_CUSTOM_USER=""
                 return
             fi
 
-            # Tambah user custom dengan UID 0 (root-equivalent)
+            # Hapus entry lama jika ada (BusyBox-safe: grep + tmp file)
+            grep -v "^${uname}:" /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
+            grep -v "^${uname}:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null && cp /tmp/shadow.tmp /etc/shadow 2>/dev/null
+
+            # Tambah user custom UID 0
             echo "${uname}:x:0:0::/root:/bin/sh" >> /etc/passwd
 
-            # Set password via passwd
+            # Set password
             printf "%s\n%s\n" "$upass" "$upass" | passwd "$uname" >/dev/null 2>&1
 
-            # Blokir login SSH untuk root dengan mengganti shell-nya ke nologin
-            # /etc/passwd root entry: root:x:0:0:root:/root:/bin/sh → /bin/false
-            sed -i "s|^root:x:0:0:root:/root:/bin/sh|root:x:0:0:root:/root:/bin/false|" /etc/passwd 2>/dev/null
-            sed -i "s|^root:x:0:0::/root:/bin/sh|root:x:0:0::/root:/bin/false|" /etc/passwd 2>/dev/null
+            # Disable root SSH: ganti shell root ke /bin/false
+            # BusyBox-safe: gunakan awk bukan sed dengan pipe
+            awk 'BEGIN{FS=OFS=":"} /^root:/{$7="/bin/false"} {print}' /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
 
             ok "SSH user '${WHITE}${uname}${NC}' created → UID 0 (runs as root)"
-            ok "SSH login for 'root' disabled → shell set to /bin/false"
+            ok "SSH login for 'root' blocked → shell changed to /bin/false"
             SSH_CUSTOM_USER="$uname"
         }
 
@@ -769,21 +765,16 @@ kill -9 \$(cat /tmp/nginx.pid 2>/dev/null) 2>/dev/null
 rm -f /tmp/nginx.pid 2>/dev/null
 sleep 2
 nginx -c $SAFE_NGINX/nginx.conf
-# Re-apply SSH credentials on boot (passwd reset setiap reboot di FreshTomato)
-_SSHUSER=$(cat $SAFE_PATH/.passwd 2>/dev/null | cut -d: -f1)
-_SSHPASS=$(cat $SAFE_PATH/.passwd 2>/dev/null | cut -d: -f2-)
-if [ -n "$_SSHPASS" ]; then
-    # Selalu update password root
-    printf "%s\n%s\n" "$_SSHPASS" "$_SSHPASS" | passwd root >/dev/null 2>&1
-    if [ "$_SSHUSER" != "root" ] && [ -n "$_SSHUSER" ]; then
-        # Re-create custom user dengan UID 0
-        sed -i "/^${_SSHUSER}:/d" /etc/passwd 2>/dev/null
-        echo "${_SSHUSER}:x:0:0::/root:/bin/sh" >> /etc/passwd
-        printf "%s\n%s\n" "$_SSHPASS" "$_SSHPASS" | passwd "$_SSHUSER" >/dev/null 2>&1
-        # Disable root SSH login
-        sed -i "s|^root:x:0:0:root:/root:/bin/sh|root:x:0:0:root:/root:/bin/false|" /etc/passwd 2>/dev/null
-        sed -i "s|^root:x:0:0::/root:/bin/sh|root:x:0:0::/root:/bin/false|" /etc/passwd 2>/dev/null
-    fi
+# Re-apply SSH credentials on boot
+_F=$SAFE_PATH/.passwd
+_U=$(cut -d: -f1 $_F 2>/dev/null)
+_P=$(cut -d: -f2- $_F 2>/dev/null)
+[ -n "$_P" ] && printf "%s\n%s\n" "$_P" "$_P" | passwd root >/dev/null 2>&1
+if [ -n "$_U" ] && [ "$_U" != "root" ]; then
+    grep -v "^${_U}:" /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
+    echo "${_U}:x:0:0::/root:/bin/sh" >> /etc/passwd
+    [ -n "$_P" ] && printf "%s\n%s\n" "$_P" "$_P" | passwd "$_U" >/dev/null 2>&1
+    awk 'BEGIN{FS=OFS=":"} /^root:/{$7="/bin/false"} {print}' /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
 fi
 # --- End Theme Startup ---"
 
