@@ -72,28 +72,23 @@ html,body{width:100%;height:100%;overflow:hidden;background:#080610;font-family:
   // Gunakan FreshTomato native reboot function via nginx proxy ke httpd
   // nginx forward request ke tomato.cgi dengan Authorization header yang benar
   // http_id diambil dari nvram yang sudah ada di halaman FreshTomato
-  function doReboot() {
-    try {
-      // Cara 1: pakai form.submitHidden dari tomato.js (sudah load via bg-video.js chain)
-      var httpId = (typeof nvram !== 'undefined' && nvram.http_id) ? nvram.http_id : '';
-      var x = new XMLHttpRequest();
-      x.open('POST', '/tomato.cgi', true);
-      x.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-      x.timeout = 5000;
-      x.onreadystatechange = x.ontimeout = x.onerror = function(){
-        setSt('Rebooting…');
-        startTimer();
-        setTimeout(poll, 22000);
-      };
-      x.send('_reboot=1&_commit=0&_nvset=0&_http_id=' + encodeURIComponent(httpId));
-    } catch(e) {
-      setSt('Rebooting…');
-      startTimer();
-      setTimeout(poll, 22000);
-    }
-  }
-  // Tunggu sebentar agar nvram ter-load dari tomato.js
-  setTimeout(doReboot, 800);
+  // POST ke /tomato.cgi dengan http_id yang di-inject saat install
+  var x = new XMLHttpRequest();
+  x.open('POST', '/tomato.cgi', true);
+  x.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+  x.timeout = 5000;
+  x.onreadystatechange = function(){
+    if(x.readyState !== 4) return;
+    setSt('Rebooting…');
+    startTimer();
+    setTimeout(poll, 22000);
+  };
+  x.ontimeout = x.onerror = function(){
+    setSt('Rebooting…');
+    startTimer();
+    setTimeout(poll, 22000);
+  };
+  x.send('_reboot=1&_commit=0&_nvset=0&_http_id=FT_HTTP_ID');
 
   // Adaptive color
   var vid=document.getElementById('bg'),cv=document.createElement('canvas');
