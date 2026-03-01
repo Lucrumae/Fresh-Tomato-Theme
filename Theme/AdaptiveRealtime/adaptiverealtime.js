@@ -580,7 +580,8 @@
     }
 
     // Patch semua link/onclick reboot di DOM
-    function patchRebootLinks(){
+    function patchLinks(){
+        // Patch reboot links
         document.querySelectorAll('[href*="reboot"],[onclick*="reboot"]')
             .forEach(function(el){
                 if(el.dataset.ftP) return; el.dataset.ftP='1';
@@ -601,21 +602,137 @@
                     });
                 }
             });
+
+        // Patch logout links
+        document.querySelectorAll('[href*="logout"],[onclick*="logout"],[href*="logout.asp"]')
+            .forEach(function(el){
+                if(el.dataset.ftLo) return; el.dataset.ftLo='1';
+                el.setAttribute('onclick','return false;');
+                el.addEventListener('click',function(e){
+                    e.preventDefault();e.stopPropagation();
+                    showLogoutDialog();
+                });
+            });
+
+        // Patch halt links
+        document.querySelectorAll('[onclick*="halt"]')
+            .forEach(function(el){
+                if(el.dataset.ftH) return; el.dataset.ftH='1';
+                el.setAttribute('onclick','return false;');
+                el.addEventListener('click',function(e){
+                    e.preventDefault();e.stopPropagation();
+                    showGenericDialog('Halt?','halt');
+                });
+            });
+    }
+
+    function showLogoutDialog(){
+        if(document.getElementById('ft-dlg')) return;
+        var acc = getAccentNow();
+
+        var s = document.createElement('style');
+        s.id = 'ft-dlg-s';
+        s.textContent =
+            '#ft-dlg-bd{position:fixed;inset:0;z-index:99998;' +
+                'background:rgba(0,0,0,.55);backdrop-filter:blur(4px);' +
+                '-webkit-backdrop-filter:blur(4px);animation:ftBdIn .2s ease}' +
+            '@keyframes ftBdIn{from{opacity:0}to{opacity:1}}' +
+            '#ft-dlg{position:fixed;top:50%;left:50%;' +
+                'z-index:99999;background:rgba(8,6,10,.80);' +
+                'border:1px solid rgba(255,255,255,.10);border-radius:18px;' +
+                'padding:32px 36px 24px;min-width:280px;max-width:340px;' +
+                'backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);' +
+                'box-shadow:0 16px 56px rgba(0,0,0,.7);text-align:center;' +
+                'font-family:Outfit,sans-serif;' +
+                'animation:ftDlgIn .25s cubic-bezier(.22,1,.36,1) forwards}' +
+            '@keyframes ftDlgIn{' +
+                'from{opacity:0;transform:translate(-50%,-46%) scale(.94)}' +
+                'to{opacity:1;transform:translate(-50%,-54%) scale(1)}}' +
+            '#ft-dlg.out{animation:ftDlgOut .18s ease forwards!important}' +
+            '@keyframes ftDlgOut{to{opacity:0;transform:translate(-50%,-46%) scale(.95)}}' +
+            '#ft-dlg svg{display:block;margin:0 auto 16px;width:40px;height:40px}' +
+            '#ft-dlg h3{font-size:17px;font-weight:700;color:#f0ece8;margin:0 0 6px}' +
+            '#ft-dlg p{font-size:12px;color:rgba(240,236,232,.45);margin:0 0 24px;line-height:1.5}' +
+            '#ft-dlg-row{display:flex;gap:10px}' +
+            '#ft-dlg-no{flex:1;padding:11px;border:1px solid rgba(255,255,255,.12);' +
+                'border-radius:10px;background:rgba(255,255,255,.06);' +
+                'color:rgba(240,236,232,.7);font-size:13px;font-family:Outfit,sans-serif;' +
+                'cursor:pointer;transition:opacity .15s,transform .15s}' +
+            '#ft-dlg-no:hover{opacity:.75;transform:translateY(-1px)}' +
+            '#ft-dlg-yes{flex:1;padding:11px;border:none;border-radius:10px;' +
+                'font-size:13px;font-weight:700;font-family:Outfit,sans-serif;' +
+                'cursor:pointer;color:#0e0810;transition:opacity .15s,transform .15s}' +
+            '#ft-dlg-yes:hover{opacity:.85;transform:translateY(-1px)}';
+
+        var bd  = document.createElement('div'); bd.id='ft-dlg-bd';
+        var dlg = document.createElement('div'); dlg.id='ft-dlg';
+        dlg.innerHTML =
+            '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.5"' +
+            ' stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>' +
+            '<polyline points="16 17 21 12 16 7"/>' +
+            '<line x1="21" y1="12" x2="9" y2="12"/>' +
+            '</svg>' +
+            '<h3>Log Out?</h3>' +
+            '<p>You will be returned to the login page.</p>' +
+            '<div id="ft-dlg-row">' +
+            '<button id="ft-dlg-no">Cancel</button>' +
+            '<button id="ft-dlg-yes">Log Out</button></div>';
+
+        document.head.appendChild(s);
+        document.body.appendChild(bd);
+        document.body.appendChild(dlg);
+
+        function applyAccent(col){
+            var yes=document.getElementById('ft-dlg-yes');
+            var svg=dlg.querySelector('svg');
+            if(yes) yes.style.background=col;
+            if(svg) svg.setAttribute('stroke',col);
+        }
+        applyAccent(acc);
+        var mo=new MutationObserver(function(){
+            var col=(getComputedStyle(document.documentElement).getPropertyValue('--accent')||'').trim();
+            if(col) applyAccent(col);
+        });
+        mo.observe(document.documentElement,{attributes:true,attributeFilter:['style']});
+        var syncT=setInterval(function(){
+            var col=(getComputedStyle(document.documentElement).getPropertyValue('--accent')||'').trim();
+            if(col) applyAccent(col);
+        },200);
+
+        function closeDlg(){
+            mo.disconnect(); clearInterval(syncT);
+            dlg.classList.add('out');
+            bd.style.transition='opacity .18s ease'; bd.style.opacity='0';
+            setTimeout(function(){
+                [dlg,bd,s].forEach(function(el){
+                    el.parentNode && el.parentNode.removeChild(el);
+                });
+            },200);
+        }
+
+        document.getElementById('ft-dlg-yes').addEventListener('click',function(){
+            closeDlg();
+            setTimeout(function(){
+                // Logout via FreshTomato native
+                if(typeof form!=='undefined'&&form.submitHidden){
+                    form.submitHidden('logout.asp',{});
+                } else {
+                    window.location.href='/logout.asp';
+                }
+            },220);
+        });
+        document.getElementById('ft-dlg-no').addEventListener('click',closeDlg);
+        bd.addEventListener('click',closeDlg);
     }
 
     function installPatcher(){
-        patchRebootLinks();
+        patchLinks();
         var pmo=new MutationObserver(function(muts){
             muts.forEach(function(m){
                 m.addedNodes.forEach(function(n){
                     if(n.nodeType===1){
-                        if((n.getAttribute('href')||'').indexOf('reboot')!==-1||
-                           (n.getAttribute('onclick')||'').indexOf('reboot')!==-1){
-                            n.dataset.ftP=''; patchRebootLinks();
-                        }
-                        n.querySelectorAll&&n.querySelectorAll(
-                            '[href*="reboot"],[onclick*="reboot"]'
-                        ).forEach(function(c){c.dataset.ftP='';patchRebootLinks();});
+                        patchLinks();
                     }
                 });
             });
