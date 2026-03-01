@@ -542,6 +542,29 @@ http {
             try_files \$uri =404;
         }
 
+        # reboot-wait.html — hanya jika sudah login (ada cookie ft_auth)
+        location = /reboot-wait.html {
+            set \$rw_auth "0";
+            if (\$cookie_ft_auth) { set \$rw_auth "1"; }
+            if (\$rw_auth = "0") { return 302 /login.html; }
+            add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+            try_files \$uri =404;
+        }
+
+        # /tomato.cgi — hanya jika sudah login
+        location = /tomato.cgi {
+            set \$tc_auth "0";
+            if (\$cookie_ft_auth) { set \$tc_auth "1"; }
+            if (\$tc_auth = "0") { return 403; }
+            proxy_pass http://$LAN_IP:8008;
+            proxy_set_header Authorization \$auth_header;
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_buffering on;
+        }
+
         # Static files
         location ~* \.(css|js|png|jpg|jpeg|ico|svg|woff|woff2|html)$ {
             try_files \$uri @proxy;
