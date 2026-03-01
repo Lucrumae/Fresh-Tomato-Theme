@@ -98,31 +98,77 @@ echo -ne "  ${CYAN}[1/5]${NC}  Checking previous installation...       "
 if [ -d "$INSTALL_PATH" ] && [ "$(ls -A $INSTALL_PATH 2>/dev/null)" ]; then
     echo -e "${YELLOW}found${NC}"; echo ""
     warn "Previous installation at ${DIM}$INSTALL_PATH${NC}"; echo ""
-    printf "  Overwrite? (y/n): "; read confirm < /dev/tty; echo ""
+    printf "  Uninstall and reinstall? (y/n): "; read confirm < /dev/tty; echo ""
     case "$confirm" in
         y|Y)
-            echo -ne "  ${CYAN}[1/5]${NC}  Removing previous...                    "
-            # Stop semua nginx dulu
+            echo -e "  ${CYAN}[1/5]${NC}  Uninstalling previous..."; echo ""
+
+            # 1. Stop reboot-daemon jika ada
+            printf "        ${DIM}%-30s${NC} " "stopping reboot-daemon"
+            kill $(ps 2>/dev/null | grep reboot-daemon | grep -v grep | awk '{print $1}') 2>/dev/null
+            kill $(netstat -tlnp 2>/dev/null | grep ':8009 ' | awk '{print $7}' | cut -d/ -f1) 2>/dev/null
+            echo -e "${BGREEN}done${NC}"
+
+            # 2. Stop nginx
+            printf "        ${DIM}%-30s${NC} " "stopping nginx"
             pkill -9 nginx 2>/dev/null
             kill -9 $(cat /tmp/nginx.pid 2>/dev/null) 2>/dev/null
             rm -f /tmp/nginx.pid 2>/dev/null
             sleep 1
-            umount -l /www 2>/dev/null; sleep 1
-            # Hapus keduanya: install path dan nginx config
+            echo -e "${BGREEN}done${NC}"
+
+            # 3. Unmount /www bind mount
+            printf "        ${DIM}%-30s${NC} " "unmounting /www"
+            umount -l /www 2>/dev/null
+            sleep 1
+            echo -e "${BGREEN}done${NC}"
+
+            # 4. Restore httpd ke port 80
+            printf "        ${DIM}%-30s${NC} " "restoring httpd port 80"
+            nvram set http_lanport=80
+            nvram commit >/dev/null 2>&1
+            service httpd restart >/dev/null 2>&1
+            echo -e "${BGREEN}done${NC}"
+
+            # 5. Hapus boot entry dari script_init
+            printf "        ${DIM}%-30s${NC} " "cleaning script_init"
+            CURRENT=$(nvram get script_init 2>/dev/null)
+            STRIPPED=$(printf '%s
+' "$CURRENT" | awk '
+                /^# --- FreshTomato Theme ---$/ { skip=1; next }
+                /^# --- End FreshTomato Theme ---$/ { skip=0; next }
+                /^# --- Theme Startup ---$/ { skip=1; next }
+                /^# --- End Theme Startup ---$/ { skip=0; next }
+                skip { next }
+                { print }
+            ')
+            STRIPPED=$(printf '%s' "$STRIPPED" | sed '/^[[:space:]]*$/d')
+            nvram set script_init="$STRIPPED"
+            nvram commit >/dev/null 2>&1
+            echo -e "${BGREEN}done${NC}"
+
+            # 6. Hapus semua file instalasi
+            printf "        ${DIM}%-30s${NC} " "removing install files"
             rm -rf "$INSTALL_PATH"
             rm -rf "$NGINX_PATH"
-            echo -e "${BGREEN}done${NC}" ;;
+            rm -f /tmp/ft_reboot_now /tmp/ft_reboot_log 2>/dev/null
+            echo -e "${BGREEN}done${NC}"
+
+            echo ""
+            echo -e "  ${BGREEN}✔  Uninstall complete. Proceeding with fresh install...${NC}"; echo ""
+            ;;
         *) echo -e "  ${CYAN}→${NC}  Cancelled."; exit 0 ;;
     esac
 else
     echo -e "${BGREEN}clean${NC}"
-    # Jika nginx folder ada dari install sebelumnya, hapus juga
+    # Bersihkan sisa nginx/flag jika ada
     pkill -9 nginx 2>/dev/null
     kill -9 $(cat /tmp/nginx.pid 2>/dev/null) 2>/dev/null
     rm -f /tmp/nginx.pid 2>/dev/null
     sleep 1
     umount -l /www 2>/dev/null; sleep 1
     [ -d "$NGINX_PATH" ] && rm -rf "$NGINX_PATH"
+    rm -f /tmp/ft_reboot_now /tmp/ft_reboot_log 2>/dev/null
 fi
 
 echo -ne "  ${CYAN}[2/5]${NC}  Mirroring /www to JFFS...               "
@@ -192,8 +238,9 @@ do_wget "$BASE_URL/reboot-wait.html" "$INSTALL_PATH/reboot-wait.html"
 if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/reboot-wait.html" ]; then
     SIZE=$(ls -lh "$INSTALL_PATH/reboot-wait.html" | awk '{print $5}')
     echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
-    # Inject credentials ke reboot-wait.html
-    sed -i "s/FTUSER/${HTTP_USER}/g; s/FTPASS/${HTTP_PASS}/g" "$INSTALL_PATH/reboot-wait.html"
+    # Inject http_id ke reboot-wait.html
+    FT_HTTP_ID=$(nvram get http_id 2>/dev/null)
+    sed -i "s/FT_HTTP_ID/${FT_HTTP_ID}/g" "$INSTALL_PATH/reboot-wait.html"
 else
     echo -e "${RED}failed${NC}"; fail "Cannot download reboot-wait.html."; exit 1
 fi
@@ -598,10 +645,9 @@ nginx -c "$SAFE_NGINX/nginx.conf"
     cp "$SAFE_PATH/login.html" "$SAFE_NGINX/static/login.html" 2>/dev/null
 if [ -f "$SAFE_PATH/reboot-wait.html" ]; then
     cp "$SAFE_PATH/reboot-wait.html" "$SAFE_NGINX/static/reboot-wait.html" 2>/dev/null
-    # Inject credentials (ambil dari .passwd)
-    _U=$(cut -d: -f1 "$SAFE_PATH/.passwd" 2>/dev/null)
-    _P=$(cut -d: -f2 "$SAFE_PATH/.passwd" 2>/dev/null)
-    sed -i "s/FTUSER/$_U/g; s/FTPASS/$_P/g" "$SAFE_NGINX/static/reboot-wait.html" 2>/dev/null
+    # Inject http_id yang fresh setiap boot
+    _ID=$(nvram get http_id 2>/dev/null)
+    sed -i "s/FT_HTTP_ID/$_ID/g" "$SAFE_NGINX/static/reboot-wait.html" 2>/dev/null
 fi
 
 # 6. SSH CREDENTIALS: /etc/passwd + /etc/shadow di-reset tiap boot dari tmpfs
