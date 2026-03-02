@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Halting…</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#080610;font-family:Outfit,ui-sans-serif,sans-serif}
+#bg{position:fixed;inset:0;width:100vw;height:100vh;object-fit:cover;z-index:0;pointer-events:none}
+#ov{position:fixed;inset:0;z-index:1;background:rgba(8,6,10,.50);transition:background 1.2s ease}
+#wrap{position:fixed;inset:0;z-index:2;display:flex;align-items:center;justify-content:center}
+#card{background:rgba(8,6,10,.55);border:1px solid rgba(255,255,255,.10);border-radius:20px;
+  padding:44px 52px;backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  box-shadow:0 8px 48px rgba(0,0,0,.6);text-align:center;min-width:300px;
+  transition:background 1.2s ease,border-color 1.2s ease;animation:cardIn .5s cubic-bezier(.22,1,.36,1)}
+@keyframes cardIn{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+#ico{width:48px;height:48px;display:block;margin:0 auto 20px}
+#ico.pulse{animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.95)}}
+#ico.done{animation:none;opacity:.6}
+#ttl{font-size:18px;font-weight:700;color:#f0ece8;letter-spacing:-.01em;margin-bottom:6px}
+#sub{font-size:11px;color:rgba(240,236,232,.40);letter-spacing:.14em;text-transform:uppercase;
+  font-family:"Space Mono",monospace;margin-bottom:28px}
+#bwrap{width:100%;height:3px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;margin-bottom:14px}
+#bar{height:100%;width:0%;border-radius:4px;background:linear-gradient(90deg,var(--a,#e8a86e),var(--a2,#7ec8e3));transition:width .8s ease}
+#msg{font-size:13px;color:rgba(240,236,232,.75);letter-spacing:.01em;margin-bottom:6px;min-height:20px;transition:opacity .4s}
+#st{font-size:11px;color:rgba(240,236,232,.25);margin-top:10px;font-family:"Space Mono",monospace;min-height:16px}
+</style>
+</head>
+<body>
+<video id="bg" autoplay loop muted playsinline>
+  <source src="/bgmp4.gif" type="video/mp4">
+</video>
+<div id="ov"></div>
+<div id="wrap"><div id="card">
+  <!-- Power icon -->
+  <svg id="ico" class="pulse" viewBox="0 0 24 24" fill="none" stroke="var(--a,#e8a86e)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
+    <line x1="12" y1="2" x2="12" y2="12"/>
+  </svg>
+  <div id="ttl">Halting Router</div>
+  <div id="sub">Please Wait</div>
+  <div id="bwrap"><div id="bar"></div></div>
+  <div id="msg">Shutting down…</div>
+  <div id="st">The router is powering off</div>
+</div></div>
+<script>
+(function(){
+  var bar  = document.getElementById('bar'),
+      msg  = document.getElementById('msg'),
+      st   = document.getElementById('st'),
+      ov   = document.getElementById('ov'),
+      card = document.getElementById('card'),
+      ico  = document.getElementById('ico');
+
+  // Sequence steps: [delay_ms, bar_pct, msg_text, st_text]
+  var steps = [
+    [0,    10, 'Sending halt command…',        'Waiting for response…'],
+    [2000, 30, 'Shutting down services…',       'Stopping daemons…'],
+    [4500, 55, 'Unmounting filesystems…',       'Flushing NVRAM…'],
+    [6500, 75, 'Powering off…',                 'Router is halting…'],
+    [8500, 95, 'Router has halted.',            'You can now unplug the power.'],
+    [9500, 100,'You can now unplug the router.','Power off complete.'],
+  ];
+
+  steps.forEach(function(s){
+    setTimeout(function(){
+      bar.style.width = s[1] + '%';
+      msg.style.opacity = '0';
+      setTimeout(function(){
+        msg.textContent = s[2];
+        st.textContent  = s[3];
+        msg.style.opacity = '1';
+      }, 200);
+      // Final state: stop pulsing, dim icon
+      if(s[1] >= 95){
+        ico.className = 'done';
+      }
+    }, s[0]);
+  });
+
+  // Adaptive color — sama persis dengan reboot-wait.html
+  var vid = document.getElementById('bg'),
+      cv  = document.createElement('canvas');
+  cv.width = 64; cv.height = 36;
+  var ctx = cv.getContext('2d'), lh = -1;
+
+  function H(h,s,l){
+    h/=360;s/=100;l/=100;
+    var q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;
+    function f(t){t<0&&(t+=1);t>1&&(t-=1);
+      return t<1/6?p+(q-p)*6*t:t<.5?q:t<2/3?p+(q-p)*(2/3-t)*6:p;}
+    return[~~(f(h+1/3)*255),~~(f(h)*255),~~(f(h-1/3)*255)];
+  }
+  function toHsl(r,g,b){
+    r/=255;g/=255;b/=255;
+    var mx=Math.max(r,g,b),mn=Math.min(r,g,b),h,s,l=(mx+mn)/2;
+    if(mx===mn){h=s=0;}else{
+      var d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);
+      h=mx===r?((g-b)/d+(g<b?6:0))/6:mx===g?((b-r)/d+2)/6:((r-g)/d+4)/6;
+    }
+    return[h*360,s*100,l*100];
+  }
+  function sample(){
+    if(vid.readyState<2){setTimeout(sample,500);return;}
+    try{
+      ctx.drawImage(vid,0,0,64,36);
+      var px=ctx.getImageData(0,0,64,36).data,r=0,g=0,b=0,n=0;
+      for(var i=0;i<px.length;i+=4){
+        var br=(px[i]+px[i+1]+px[i+2])/3;
+        if(br<15||br>240)continue;
+        r+=px[i];g+=px[i+1];b+=px[i+2];n++;
+      }
+      if(!n){setTimeout(sample,500);return;}
+      r=~~(r/n);g=~~(g/n);b=~~(b/n);
+      var hsl=toHsl(r,g,b),hue=hsl[0],sat=hsl[1],lum=hsl[2];
+      var d=Math.abs(hue-lh);if(d>180)d=360-d;
+      if(lh<0||d>=5){
+        lh=hue;var dk=lum<50,s2=Math.max(sat,50);
+        var ac=H(hue,Math.max(s2,65),dk?68:42),
+            a2=H((hue+40)%360,Math.max(s2,55),dk?72:40);
+        var pn=H(hue,Math.min(s2,40),dk?Math.min(lum+8,20):Math.max(lum-8,80));
+        var oc=Math.max(pn[0]-30,0)+','+Math.max(pn[1]-30,0)+','+Math.max(pn[2]-30,0);
+        var as='rgb('+ac[0]+','+ac[1]+','+ac[2]+')';
+        ov.style.background  = 'rgba('+oc+',.50)';
+        card.style.background= 'rgba('+pn[0]+','+pn[1]+','+pn[2]+',.48)';
+        card.style.borderColor='rgba('+ac[0]+','+ac[1]+','+ac[2]+',.20)';
+        document.documentElement.style.setProperty('--a', as);
+        document.documentElement.style.setProperty('--a2','rgb('+a2[0]+','+a2[1]+','+a2[2]+')');
+        ico.setAttribute('stroke', as);
+      }
+    }catch(e){}
+    setTimeout(sample,500);
+  }
+  vid.addEventListener('canplay',sample,{once:true});
+  vid.play().catch(function(){});
+})();
+</script>
+</body>
+</html>
