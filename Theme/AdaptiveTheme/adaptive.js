@@ -16,9 +16,30 @@
         navStyle.textContent='td#navi a.indent1.active,#navi a.indent1.active,#navi:not(:hover) a.indent1.active,td#navi:not(:hover) a.indent1.active{margin:2px 5px 2px 5px!important;padding-left:5px!important;border:1.5px solid currentColor!important;border-radius:6px!important;background:rgba(255,255,255,0.08)!important;backdrop-filter:blur(12px) saturate(1.4)!important;-webkit-backdrop-filter:blur(12px) saturate(1.4)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,0.15),0 2px 8px rgba(0,0,0,0.25)!important;filter:brightness(1.5)!important;color:inherit!important;}td#navi a.indent2.active,#navi a.indent2.active{margin:2px 5px 2px 5px!important;padding-left:5px!important;border:1.5px solid currentColor!important;border-radius:6px!important;background:rgba(255,255,255,0.08)!important;backdrop-filter:blur(12px) saturate(1.4)!important;-webkit-backdrop-filter:blur(12px) saturate(1.4)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,0.15),0 2px 8px rgba(0,0,0,0.25)!important;filter:brightness(1.5)!important;color:inherit!important;}td#navi a.indent2.active::after,#navi a.indent2.active::after,td#navi:not(:hover) a.indent1.active::after,#navi:not(:hover) a.indent1.active::after{display:none!important;}td#navi a:hover,#navi a:hover{background:rgba(255,255,255,0.08)!important;backdrop-filter:blur(12px) saturate(1.4)!important;-webkit-backdrop-filter:blur(12px) saturate(1.4)!important;border:1px solid rgba(255,255,255,0.18)!important;border-radius:6px!important;margin:1px 5px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,0.15),0 2px 8px rgba(0,0,0,0.25)!important;transition:background 0.2s,backdrop-filter 0.2s,border 0.2s!important;}';
         document.head.appendChild(navStyle);
     }
-    if(document.readyState==='loading'){
-        document.addEventListener('DOMContentLoaded',_injectNavStyle);
-    } else { _injectNavStyle(); }
+    // Inject setelah semua CSS selesai, dengan MutationObserver sebagai failsafe
+    function _ensureNavGlass(){
+        var el=document.getElementById('ft-nav-glass');
+        if(el) el.parentNode.removeChild(el);
+        _injectNavStyle();
+    }
+    if(document.readyState==='complete'){
+        _injectNavStyle();
+    } else {
+        window.addEventListener('load',_injectNavStyle);
+    }
+    // MutationObserver: re-inject jika ada stylesheet baru ditambahkan
+    if(window.MutationObserver){
+        new MutationObserver(function(muts){
+            for(var i=0;i<muts.length;i++){
+                for(var j=0;j<muts[i].addedNodes.length;j++){
+                    var n=muts[i].addedNodes[j];
+                    if(n.tagName==='LINK'||n.tagName==='STYLE'){
+                        if(n.id!=='ft-nav-glass') _ensureNavGlass();
+                    }
+                }
+            }
+        }).observe(document.head,{childList:true});
+    }
 
 
     var vid = document.createElement('video');
