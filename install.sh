@@ -9,7 +9,6 @@ LIST_FILE="ThemeList.txt"
 BASE_DIR="/jffs/Theme"
 INSTALL_PATH="/jffs/Theme/www"
 NGINX_PATH="/jffs/Theme/nginx"
-ETC_PATH="/jffs/Theme/etc"
 TEMP_WORKSPACE="/tmp/theme_deploy"
 THEME_FILES="default.css logol.png logor.png bgmp4.gif"
 
@@ -183,8 +182,6 @@ if [ -d "$INSTALL_PATH" ] && [ "$(ls -A $INSTALL_PATH 2>/dev/null)" ]; then
 
             # 6. Hapus semua file instalasi
             printf "        ${DIM}%-30s${NC} " "removing install files"
-            umount -l "$BASE_DIR/etc" 2>/dev/null
-            sleep 1
             rm -rf "$BASE_DIR"
             rm -f /tmp/ft_reboot_now /tmp/ft_reboot_log 2>/dev/null
             echo -e "${BGREEN}done${NC}"
@@ -205,8 +202,6 @@ else
     rm -f /tmp/nginx.pid 2>/dev/null
     sleep 1
     umount -l /www 2>/dev/null; sleep 1
-    umount -l "$BASE_DIR/etc" 2>/dev/null
-    sleep 1
     [ -d "$BASE_DIR" ] && rm -rf "$BASE_DIR"
     rm -f /tmp/ft_reboot_now /tmp/ft_reboot_log 2>/dev/null
 fi
@@ -316,14 +311,6 @@ JSEOF
     rm -f /tmp/ft_log_patch.js /tmp/ft_log_patched.asp 2>/dev/null
 fi
 
-echo -e "${BGREEN}done${NC}"
-
-echo -ne "        ${DIM}Preparing Theme/etc...              ${NC}  "
-umount -l "$ETC_PATH" 2>/dev/null
-sleep 1
-mkdir -p "$ETC_PATH"
-# Buat motd baru yang benar-benar writable (bukan copy dari /rom/etc yang read-only)
-printf '' > "$ETC_PATH/motd"
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
@@ -1025,7 +1012,6 @@ NGINXEOF
 #!/bin/sh
 SAFE_PATH=/jffs/Theme/www
 SAFE_NGINX=/jffs/Theme/nginx
-SAFE_ETC=/jffs/Theme/etc
 BOOTEOF
 
     # Append bagian yang butuh variable expansion
@@ -1043,7 +1029,6 @@ BOOTEOF2
 # 1. MOUNT: bind /jffs/Theme/www → /www agar theme aktif
 [ -d "$SAFE_PATH" ] || exit 0
 mount | grep -q "$SAFE_PATH" || mount --bind "$SAFE_PATH" /www
-# /jffs/Theme/etc sudah berisi copy dari /rom/etc sejak install
 
 # 2. THEME SCRIPT: pastikan video/adaptive script ter-inject ke tomato.js
 if [ -f "$SAFE_PATH/tomato.js" ] && [ -n "$SAFE_SCRIPT" ]; then
@@ -1156,12 +1141,9 @@ else
     cat > "$BASE_DIR/boot.sh" << FALLBACKEOF
 #!/bin/sh
 SAFE_PATH=$SAFE_PATH
-SAFE_ETC=/jffs/Theme/etc
 SAFE_SCRIPT=$SAFE_SCRIPT
 [ -d "\$SAFE_PATH" ] || exit 0
-mount | grep -q "\$SAFE_PATH" || mount --bind "\$SAFE_PATH" /www
-
-service httpd restart
+mount | grep -q "\$SAFE_PATH" || { mount --bind "\$SAFE_PATH" /www && service httpd restart; }
 grep -q "\$SAFE_SCRIPT" "\$SAFE_PATH/tomato.js" 2>/dev/null || \
     printf 'document.addEventListener("DOMContentLoaded",function(){var s=document.createElement("script");s.src="/%s";document.head.appendChild(s);});\n' \
     "\$SAFE_SCRIPT" >> "\$SAFE_PATH/tomato.js"
@@ -1217,36 +1199,6 @@ nvram commit >/dev/null 2>&1
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
-# MOTD: tulis tampilan custom terminal ke Theme/etc/motd
-# =================================================================
-_R=$(nvram get t_model_name 2>/dev/null || hostname 2>/dev/null)
-_F=$(nvram get os_version 2>/dev/null | cut -c1-32)
-_D=$(date "+%Y-%m-%d %H:%M")
-_CC=$(grep -c '^processor' /proc/cpuinfo 2>/dev/null)
-_CM=$(grep -i 'cpu MHz\|BogoMIPS\|clock' /proc/cpuinfo 2>/dev/null | head -1 | awk '{printf "%.0f",$NF}')
-_U=$(nvram get http_username 2>/dev/null)
-PK='\033[1;35m'; WH='\033[1;37m'; CY='\033[0;36m'; DM='\033[2m'; NC='\033[0m'
-{
-printf "${PK}  ╔══════════════════════════════════════════════════╗\n"
-printf "  ║   ${WH}⚡ FreshTomato Theme  ${DM}by Lucrumae${PK}              ║\n"
-printf "  ╚══════════════════════════════════════════════════╝${NC}\n\n"
-printf "${DM}  ┌─ System ─────────────────────────────────────────${NC}\n"
-printf "${DM}  │${NC}  ${WH}Router   ${CY}%s${NC}\n" "$_R"
-printf "${DM}  │${NC}  ${WH}Firmware ${DM}%s${NC}\n" "$_F"
-printf "${DM}  │${NC}  ${WH}CPU      ${DM}%sx @ %s MHz${NC}\n" "$_CC" "$_CM"
-printf "${DM}  │${NC}  ${WH}LAN IP   ${CY}%s${NC}\n" "$LAN_IP"
-printf "${DM}  └──────────────────────────────────────────────────${NC}\n\n"
-printf "${DM}  ┌─ Theme ──────────────────────────────────────────${NC}\n"
-printf "${DM}  │${NC}  ${WH}Name     ${PK}%s${NC}\n" "$SELECTED_NAME"
-printf "${DM}  │${NC}  ${WH}Engine   ${DM}%s${NC}\n" "$VIDEO_SCRIPT"
-printf "${DM}  │${NC}  ${WH}Installed ${DM}%s${NC}\n" "$_D"
-printf "${DM}  └──────────────────────────────────────────────────${NC}\n\n"
-printf "${DM}  ssh %s@%s${NC}\n\n" "$_U" "$LAN_IP"
-} > "$ETC_PATH/motd"
-ok "MOTD ready  →  ${DIM}$ETC_PATH/motd${NC}"
-unset _R _F _D _CC _CM _U PK WH CY DM NC
-
-# =================================================================
 # DONE
 # =================================================================
 echo ""; divider; echo ""
@@ -1261,18 +1213,16 @@ echo -e "  ${YELLOW}⚑  Press Ctrl+F5 to clear browser cache.${NC}"
 echo ""; divider; echo ""
 
 if [ "${SSHD_NEEDS_RESTART:-0}" = "1" ]; then
-    echo -e "  ${YELLOW}⚠  SSH Credentials Updated${NC}"
+    echo -e "  ${YELLOW}⚠  SSH Service Restart${NC}"
     divider
-    echo -e "  ${DIM}New credentials applied. Starting fresh SSH daemon${NC}"
-    echo -e "  ${DIM}without disconnecting your current session.${NC}"
+    echo -e "  ${DIM}New SSH credentials have been applied. The SSH daemon${NC}"
+    echo -e "  ${DIM}must restart to apply changes — your current session${NC}"
+    echo -e "  ${DIM}will be disconnected in 3 seconds.${NC}"
     echo ""
-    echo -e "  ${WHITE}Reconnect (new session) using:${NC}"
+    echo -e "  ${WHITE}Reconnect using:${NC}"
     echo -e "  ${CYAN}  ssh ${HTTP_USER}@${LAN_IP}${NC}"
     echo ""; divider; echo ""
+    sleep 3
     nvram commit >/dev/null 2>&1
-    # Jalankan dropbear baru di background — koneksi aktif tidak di-drop
-    # Dropbear lama tetap jalan untuk session ini, instance baru untuk koneksi berikutnya
-    nvram set sshd_enable=1
-    nvram set sshd_pass=1
-    ( sleep 2; killall -9 dropbear 2>/dev/null; sleep 1; service sshd start >/dev/null 2>&1 ) &
+    service sshd restart >/dev/null 2>&1
 fi
