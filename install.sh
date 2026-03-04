@@ -74,8 +74,40 @@ THEME_BASE_URL="$THEME_URL/$SELECTED_FOLDER"
 # PHASE 2: SYSTEM CHECKS
 # =================================================================
 echo ""; echo -e "  ${WHITE}System Checks${NC}"; divider
-! mount | grep -q "/jffs" && fail "JFFS not mounted." && exit 1
-ok "JFFS partition active"
+if ! mount | grep -q "/jffs"; then
+    warn "JFFS partition is not mounted."; echo ""
+    echo -e "  ${DIM}JFFS is required to store theme files persistently.${NC}"
+    echo -e "  ${DIM}You can format and enable it now (existing JFFS data will be erased).${NC}"
+    echo ""
+    printf "  Format & enable JFFS now? (y/n): "; read jffs_choice < /dev/tty; echo ""
+    case "$jffs_choice" in
+        y|Y)
+            echo -ne "        ${DIM}Formatting JFFS...                  ${NC}  "
+            nvram set jffs2_on=1
+            nvram set jffs2_format=1
+            nvram commit >/dev/null 2>&1
+            service jffs2 stop  >/dev/null 2>&1
+            service jffs2 start >/dev/null 2>&1
+            sleep 3
+            if mount | grep -q "/jffs"; then
+                echo -e "${BGREEN}done${NC}"
+                ok "JFFS partition mounted and ready"
+            else
+                echo -e "${RED}failed${NC}"
+                fail "JFFS could not be mounted. Please enable it manually:"
+                echo -e "  ${DIM}  Admin → JFFS → Enable JFFS → Format → Save & Reboot${NC}"
+                echo ""; exit 1
+            fi
+            ;;
+        *)
+            fail "JFFS not mounted — cannot continue."
+            echo -e "  ${DIM}  Enable JFFS manually: Admin → JFFS → Enable & Format → Reboot${NC}"
+            echo ""; exit 1
+            ;;
+    esac
+else
+    ok "JFFS partition active"
+fi
 FREE=$(df -k /jffs | awk 'NR==2{print $4}')
 [ "$FREE" -lt 10240 ] && warn "Low JFFS space (${FREE}KB)" || ok "JFFS space OK (${FREE}KB free)"
 
