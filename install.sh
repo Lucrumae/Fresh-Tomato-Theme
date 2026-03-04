@@ -1223,7 +1223,7 @@ _R=$(nvram get t_model_name 2>/dev/null || hostname 2>/dev/null)
 _F=$(nvram get os_version 2>/dev/null | cut -c1-32)
 _D=$(date "+%Y-%m-%d %H:%M")
 _CC=$(grep -c '^processor' /proc/cpuinfo 2>/dev/null)
-_CM=$(grep 'cpu MHz' /proc/cpuinfo 2>/dev/null | head -1 | awk '{printf "%.0f",$4}')
+_CM=$(grep -i 'cpu MHz\|BogoMIPS\|clock' /proc/cpuinfo 2>/dev/null | head -1 | awk '{printf "%.0f",$NF}')
 _U=$(nvram get http_username 2>/dev/null)
 PK='\033[1;35m'; WH='\033[1;37m'; CY='\033[0;36m'; DM='\033[2m'; NC='\033[0m'
 {
@@ -1239,7 +1239,7 @@ printf "${DM}  └────────────────────�
 printf "${DM}  ┌─ Theme ──────────────────────────────────────────${NC}\n"
 printf "${DM}  │${NC}  ${WH}Name     ${PK}%s${NC}\n" "$SELECTED_NAME"
 printf "${DM}  │${NC}  ${WH}Engine   ${DM}%s${NC}\n" "$VIDEO_SCRIPT"
-printf "${DM}  │${NC}  ${WH}Installed${DM}%s${NC}\n" "$_D"
+printf "${DM}  │${NC}  ${WH}Installed ${DM}%s${NC}\n" "$_D"
 printf "${DM}  └──────────────────────────────────────────────────${NC}\n\n"
 printf "${DM}  ssh %s@%s${NC}\n\n" "$_U" "$LAN_IP"
 } > "$ETC_PATH/motd"
