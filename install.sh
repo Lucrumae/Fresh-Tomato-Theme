@@ -181,10 +181,17 @@ echo -e "${BGREEN}done${NC}"
 echo -ne "        ${DIM}Mirroring /etc to JFFS...           ${NC}  "
 mkdir -p "$ETC_PATH"
 cp -a /etc/. "$ETC_PATH/" 2>/dev/null
-# Pastikan /jffs/Theme/etc writable (source /etc bisa read-only)
-chmod -R u+w "$ETC_PATH" 2>/dev/null
-# Mount /etc dari Theme/etc sekarang — semua perubahan passwd/shadow langsung persisten
-mount | grep -q "$ETC_PATH" || mount --bind "$ETC_PATH" /etc
+# Pastikan semua direktori dan file writable (cp -a bisa bawa attr read-only dari source)
+chmod 755 "$ETC_PATH"
+find "$ETC_PATH" -type d -exec chmod 755 {} \; 2>/dev/null
+find "$ETC_PATH" -type f -exec chmod u+w {} \; 2>/dev/null
+# Mount --bind Theme/etc → /etc sekarang, verifikasi berhasil
+if ! mount | grep -q "$ETC_PATH"; then
+    mount --bind "$ETC_PATH" /etc
+    if ! mount | grep -q "$ETC_PATH"; then
+        warn "/etc bind mount failed — MOTD will not persist across reboots"
+    fi
+fi
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
@@ -297,6 +304,9 @@ SAFE_NGINX=$(echo "$NGINX_PATH" | tr -cd 'a-zA-Z0-9/_-')
 # Kredensial — tanya user mau pakai yang sekarang atau custom
 HTTP_USER=$(nvram get http_username)
 HTTP_PASS=$(nvram get http_passwd)
+# Fallback jika nvram kosong (router fresh/reset)
+[ -z "$HTTP_USER" ] && HTTP_USER="root"
+[ -z "$HTTP_PASS" ] && HTTP_PASS="admin"
 
 echo ""
 echo ""
