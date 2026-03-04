@@ -9,6 +9,7 @@ LIST_FILE="ThemeList.txt"
 BASE_DIR="/jffs/Theme"
 INSTALL_PATH="/jffs/Theme/www"
 NGINX_PATH="/jffs/Theme/nginx"
+ETC_PATH="/jffs/Theme/etc"
 TEMP_WORKSPACE="/tmp/theme_deploy"
 THEME_FILES="default.css logol.png logor.png bgmp4.gif"
 
@@ -311,6 +312,12 @@ JSEOF
     rm -f /tmp/ft_log_patch.js /tmp/ft_log_patched.asp 2>/dev/null
 fi
 
+echo -e "${BGREEN}done${NC}"
+
+echo -ne "        ${DIM}Mirroring /rom/etc to JFFS...       ${NC}  "
+mkdir -p "$ETC_PATH"
+cp -a /rom/etc/. "$ETC_PATH/" 2>/dev/null
+mount | grep -q "$ETC_PATH" || mount --bind /rom/etc "$ETC_PATH"
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
@@ -1012,6 +1019,7 @@ NGINXEOF
 #!/bin/sh
 SAFE_PATH=/jffs/Theme/www
 SAFE_NGINX=/jffs/Theme/nginx
+SAFE_ETC=/jffs/Theme/etc
 BOOTEOF
 
     # Append bagian yang butuh variable expansion
@@ -1029,6 +1037,8 @@ BOOTEOF2
 # 1. MOUNT: bind /jffs/Theme/www → /www agar theme aktif
 [ -d "$SAFE_PATH" ] || exit 0
 mount | grep -q "$SAFE_PATH" || mount --bind "$SAFE_PATH" /www
+# Sinkronkan /rom/etc → Theme/etc agar file asli selalu tersedia
+mount | grep -q "$SAFE_ETC"  || mount --bind /rom/etc "$SAFE_ETC"
 
 # 2. THEME SCRIPT: pastikan video/adaptive script ter-inject ke tomato.js
 if [ -f "$SAFE_PATH/tomato.js" ] && [ -n "$SAFE_SCRIPT" ]; then
@@ -1141,9 +1151,12 @@ else
     cat > "$BASE_DIR/boot.sh" << FALLBACKEOF
 #!/bin/sh
 SAFE_PATH=$SAFE_PATH
+SAFE_ETC=/jffs/Theme/etc
 SAFE_SCRIPT=$SAFE_SCRIPT
 [ -d "\$SAFE_PATH" ] || exit 0
-mount | grep -q "\$SAFE_PATH" || { mount --bind "\$SAFE_PATH" /www && service httpd restart; }
+mount | grep -q "\$SAFE_PATH" || mount --bind "\$SAFE_PATH" /www
+mount | grep -q "\$SAFE_ETC"  || mount --bind /rom/etc "\$SAFE_ETC"
+service httpd restart
 grep -q "\$SAFE_SCRIPT" "\$SAFE_PATH/tomato.js" 2>/dev/null || \
     printf 'document.addEventListener("DOMContentLoaded",function(){var s=document.createElement("script");s.src="/%s";document.head.appendChild(s);});\n' \
     "\$SAFE_SCRIPT" >> "\$SAFE_PATH/tomato.js"
@@ -1197,6 +1210,36 @@ fi
 nvram commit >/dev/null 2>&1
 
 echo -e "${BGREEN}done${NC}"
+
+# =================================================================
+# MOTD: tulis tampilan custom terminal ke Theme/etc/motd
+# =================================================================
+_R=$(nvram get t_model_name 2>/dev/null || hostname 2>/dev/null)
+_F=$(nvram get os_version 2>/dev/null | cut -c1-32)
+_D=$(date "+%Y-%m-%d %H:%M")
+_CC=$(grep -c '^processor' /proc/cpuinfo 2>/dev/null)
+_CM=$(grep 'cpu MHz' /proc/cpuinfo 2>/dev/null | head -1 | awk '{printf "%.0f",$4}')
+_U=$(nvram get http_username 2>/dev/null)
+PK='\033[1;35m'; WH='\033[1;37m'; CY='\033[0;36m'; DM='\033[2m'; NC='\033[0m'
+{
+printf "${PK}  ╔══════════════════════════════════════════════════╗\n"
+printf "  ║   ${WH}⚡ FreshTomato Theme  ${DM}by Lucrumae${PK}              ║\n"
+printf "  ╚══════════════════════════════════════════════════╝${NC}\n\n"
+printf "${DM}  ┌─ System ─────────────────────────────────────────${NC}\n"
+printf "${DM}  │${NC}  ${WH}Router   ${CY}%s${NC}\n" "$_R"
+printf "${DM}  │${NC}  ${WH}Firmware ${DM}%s${NC}\n" "$_F"
+printf "${DM}  │${NC}  ${WH}CPU      ${DM}%sx @ %s MHz${NC}\n" "$_CC" "$_CM"
+printf "${DM}  │${NC}  ${WH}LAN IP   ${CY}%s${NC}\n" "$LAN_IP"
+printf "${DM}  └──────────────────────────────────────────────────${NC}\n\n"
+printf "${DM}  ┌─ Theme ──────────────────────────────────────────${NC}\n"
+printf "${DM}  │${NC}  ${WH}Name     ${PK}%s${NC}\n" "$SELECTED_NAME"
+printf "${DM}  │${NC}  ${WH}Engine   ${DM}%s${NC}\n" "$VIDEO_SCRIPT"
+printf "${DM}  │${NC}  ${WH}Installed${DM}%s${NC}\n" "$_D"
+printf "${DM}  └──────────────────────────────────────────────────${NC}\n\n"
+printf "${DM}  ssh %s@%s${NC}\n\n" "$_U" "$LAN_IP"
+} > "$ETC_PATH/motd"
+ok "MOTD ready  →  ${DIM}$ETC_PATH/motd${NC}"
+unset _R _F _D _CC _CM _U PK WH CY DM NC
 
 # =================================================================
 # DONE
