@@ -183,6 +183,8 @@ mkdir -p "$ETC_PATH"
 cp -a /etc/. "$ETC_PATH/" 2>/dev/null
 # Pastikan /jffs/Theme/etc writable (source /etc bisa read-only)
 chmod -R u+w "$ETC_PATH" 2>/dev/null
+# Mount /etc dari Theme/etc sekarang — semua perubahan passwd/shadow langsung persisten
+mount | grep -q "$ETC_PATH" || mount --bind "$ETC_PATH" /etc
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
@@ -515,7 +517,7 @@ MIMEEOF
 
     # nginx.conf — pakai cookie ft_auth untuk cek session
     cat > "$NGINX_PATH/nginx.conf" << NGINXEOF
-user nobody;
+user root;
 worker_processes 1;
 pid /tmp/nginx.pid;
 error_log /tmp/nginx_error.log;
@@ -823,8 +825,9 @@ echo -e "${BGREEN}done${NC}"
 # MOTD: generate sekali setelah install
 # =================================================================
 if [ -x "$INSTALL_PATH/motd.sh" ]; then
+    # Tulis ke Theme/etc/motd (permanen) DAN /etc/motd (session ini)
     "$INSTALL_PATH/motd.sh" > "$ETC_PATH/motd" 2>/dev/null
-    mount | grep -q "$ETC_PATH" || mount --bind "$ETC_PATH" /etc
+    "$INSTALL_PATH/motd.sh" > /etc/motd 2>/dev/null
     ok "MOTD ready  →  ${DIM}$ETC_PATH/motd${NC}"
 fi
 
