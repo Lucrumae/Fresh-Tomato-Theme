@@ -158,11 +158,14 @@ if [ -d "$INSTALL_PATH" ] && [ "$(ls -A $INSTALL_PATH 2>/dev/null)" ]; then
 
             echo ""
             echo -e "  ${BGREEN}✔  Uninstall complete. Proceeding with fresh install...${NC}"; echo ""
+            # Reinstall: _FORCE_CREDS tetap 0 — user yang sudah punya credentials
+            # tidak perlu dipaksa ganti. Mereka bisa ganti via prompt biasa.
             ;;
         *) echo -e "  ${CYAN}→${NC}  Cancelled."; exit 0 ;;
     esac
 else
     echo -e "${BGREEN}clean${NC}"
+    _FORCE_CREDS=1  # Clean install — wajib set credentials baru
     # Bersihkan sisa nginx/flag jika ada
     pkill -9 nginx 2>/dev/null
     kill -9 $(cat /tmp/nginx.pid 2>/dev/null) 2>/dev/null
@@ -173,27 +176,124 @@ else
     [ -d "$BASE_DIR" ] && rm -rf "$BASE_DIR"
     rm -f /tmp/ft_reboot_now /tmp/ft_reboot_log 2>/dev/null
 fi
+[ -z "${_FORCE_CREDS:-}" ] && _FORCE_CREDS=0
 
 echo -ne "  ${CYAN}[2/5]${NC}  Mirroring /www to JFFS...               "
-mkdir -p "$INSTALL_PATH"
+mkdir -p "$BASE_DIR" "$INSTALL_PATH"
 cp -a /www/. "$INSTALL_PATH/"
-rm -f "$INSTALL_PATH/default.css"
+# Hapus file berbahaya yang ikut di-copy dari /www
+rm -f  "$INSTALL_PATH/default.css"        # diganti theme
+rm -f  "$INSTALL_PATH/adminer.php"         # MySQL admin — berbahaya
+rm -f  "$INSTALL_PATH/phpinfo.php"         # PHP info leak — berbahaya
+rm -rf "$INSTALL_PATH/apcupsd"             # Binary ELF — tidak diperlukan
+rm -f  "$INSTALL_PATH/index.html"          # Nginx testpage — diganti kita
+# ext/cgi-bin dan user/cgi-bin kosong tapi copy tetap aman
+
+# Patch status-log.asp — default refresh 10s + async DOM rendering
+# Root cause lag: logGrid.populate() insert 500+ DOM rows satu-satu
+#   = main thread freeze 4 detik setiap refresh
+# Fix: override function via <script> injection — NO python3 needed
+# Teknik: tulis JS override ke temp file, inject sebelum </body> via awk
+if [ -f "$INSTALL_PATH/status-log.asp" ]; then
+
+    # A. Default refresh 5 → 10 detik (via sed, interval cookie masih bisa override)
+    sed -i "s/TomatoRefresh('update.cgi', 'exec=showlog', 5,/TomatoRefresh('update.cgi', 'exec=showlog', 10,/" \
+        "$INSTALL_PATH/status-log.asp" 2>/dev/null
+
+    # B. Tulis JS override ke temp file (single-quoted heredoc: no expansion, no escaping)
+    cat > /tmp/ft_log_patch.js << 'JSEOF'
+/* FreshTomato Theme — async log renderer
+ * Override logGrid.populate() dari sync DOM loop → rAF batch swap
+ * Versi asli: 500+ DOM mutations sync = freeze 4 detik
+ * Versi ini: build tbody off-screen → replaceChild 1x via requestAnimationFrame
+ */
+logGrid.populate = function() {
+if (messages == null) return;
+var self = this;
+var messagesToAdd = messages.concat();
+time = messagesToAdd.shift();
+if (entriesMode != 0)
+messagesToAdd = messagesToAdd.slice(-1 * entriesMode - 1);
+var localSearch;
+if (currentSearch) {
+localSearch = currentSearch;
+if (localSearch.substr(0, 1) == '-') {
+localSearch = localSearch.substr(1);
+negativeSearch = 1;
+} else {
+negativeSearch = 0;
+}
+}
+var rowsToRender = [];
+var count = 0;
+for (var index = 0; index < messagesToAdd.length; ++index) {
+if (messagesToAdd[index]) {
+var logLineMap = getLogLineParsedMap(messagesToAdd[index]);
+if ((currentFilterValue == 0) || (E('maxlevel').checked ?
+    (currentFilterValue >= logLineMap[LINE_PARSE_MAP_LEVEL_ATTR_POS][1]) :
+    (currentFilterValue == logLineMap[LINE_PARSE_MAP_LEVEL_ATTR_POS][1]))) {
+if (!localSearch || containsSearch(logLineMap, localSearch)) {
+rowsToRender.push(createHighlightedRow(logLineMap));
+count++;
+}
+}
+}
+}
+E('log-occurence-span').style.display = (currentSearch ? 'inline' : 'none');
+elem.setInnerHTML('log-occurence-value', count);
+if (time.indexOf('Not Available') === -1)
+elem.setInnerHTML('log-refresh-time', time.match(/(\d+\:\d+\:\d+)\s(.*)/i)[1]+' - Last Refreshed');
+var tableDiv = E('log-table');
+var wasAtBottom = (tableDiv.offsetHeight + tableDiv.scrollTop >= tableDiv.scrollHeight - 5);
+var tb = self.tb;
+var oldBody = tb.tBodies[0];
+var newBody = document.createElement('tbody');
+for (var r = 0; r < rowsToRender.length; ++r) {
+var cells = rowsToRender[r];
+var tr = newBody.insertRow(-1);
+tr.className = (1 & r) ? 'odd' : 'even';
+for (var ci = 0; ci < cells.length; ++ci) {
+tr.appendChild(cells[ci]);
+}
+}
+requestAnimationFrame(function() {
+if (oldBody) tb.replaceChild(newBody, oldBody);
+else tb.appendChild(newBody);
+var e = E('log-table').children[0].children[0].children[0];
+if (e) {
+var d = E('log-table-header').children[0].children[0].children[0];
+d.children[0].style.width = getComputedStyle(e.children[0]).width;
+d.children[1].style.width = getComputedStyle(e.children[1]).width;
+d.children[2].style.width = getComputedStyle(e.children[2]).width;
+d.children[3].style.width = getComputedStyle(e.children[3]).width;
+}
+if (wasAtBottom) scrollToBottom();
+});
+};
+JSEOF
+
+    # C. Inject JS override sebelum </body> via awk (busybox-compatible)
+    #    NR==FNR: baca file pertama (patch JS) ke variable patch
+    #    Ketemu </body>: print tag <script> + patch + </script> dulu, baru </body>
+    awk 'NR==FNR{patch=patch $0 "\n"; next} /^<\/body>$/{print "<script>"; printf "%s",patch; print "</script>"} {print}' \
+        /tmp/ft_log_patch.js "$INSTALL_PATH/status-log.asp" > /tmp/ft_log_patched.asp \
+        && mv /tmp/ft_log_patched.asp "$INSTALL_PATH/status-log.asp"
+
+    rm -f /tmp/ft_log_patch.js /tmp/ft_log_patched.asp 2>/dev/null
+fi
+
 echo -e "${BGREEN}done${NC}"
 
 echo -ne "        ${DIM}Mirroring /etc to JFFS...           ${NC}  "
 mkdir -p "$ETC_PATH"
-# Copy SELEKTIF — hanya file yang dibutuhkan untuk persistensi
-# Tidak cp -a /etc seluruhnya karena banyak symlink + file read-only dari tmpfs
+# Copy selektif — hanya file yang dibutuhkan, hindari symlink/special files
 for _f in passwd shadow group gshadow hosts hostname resolv.conf TZ localtime; do
     [ -f "/etc/$_f" ] && cp "/etc/$_f" "$ETC_PATH/$_f" 2>/dev/null
 done
-# Buat motd kosong yang writable
-touch "$ETC_PATH/motd" 2>/dev/null
-# Pastikan semua writable
+touch "$ETC_PATH/motd"
 chmod 755 "$ETC_PATH"
 chmod 644 "$ETC_PATH"/* 2>/dev/null
 chmod 640 "$ETC_PATH/shadow" 2>/dev/null
-# CATATAN: mount --bind /etc hanya dilakukan di boot.sh (setiap reboot)
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
@@ -240,7 +340,6 @@ done
 
 # login.html — pull dari GitHub
 printf "        ${DIM}%-22s${NC} " "login.html"
-mkdir -p "$BASE_DIR"
 mkdir -p "$NGINX_PATH/static"
 do_wget "$BASE_URL/login.html" "$INSTALL_PATH/login.html"
 if [ $? -ne 0 ] || [ ! -s "$INSTALL_PATH/login.html" ]; then
@@ -286,7 +385,9 @@ echo ""
 echo -ne "  ${CYAN}[4/5]${NC}  Setting permissions...                  "
 chmod 755 "$INSTALL_PATH"
 chmod 644 "$INSTALL_PATH"/* 2>/dev/null
-chmod 755 "$INSTALL_PATH"/*.cgi 2>/dev/null
+chmod 750 "$INSTALL_PATH"/*.cgi 2>/dev/null
+chown root:root "$INSTALL_PATH"/*.cgi 2>/dev/null
+chmod o-w "$INSTALL_PATH"/* 2>/dev/null
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
@@ -303,12 +404,9 @@ SAFE_PATH=$(echo "$INSTALL_PATH" | tr -cd 'a-zA-Z0-9/_-')
 SAFE_SCRIPT=$(echo "$VIDEO_SCRIPT" | tr -cd 'a-zA-Z0-9/_.-')
 SAFE_NGINX=$(echo "$NGINX_PATH" | tr -cd 'a-zA-Z0-9/_-')
 
-# Kredensial — tanya user mau pakai yang sekarang atau custom
-HTTP_USER=$(nvram get http_username)
-HTTP_PASS=$(nvram get http_passwd)
-# Fallback jika nvram kosong (router fresh/reset)
-[ -z "$HTTP_USER" ] && HTTP_USER="root"
-[ -z "$HTTP_PASS" ] && HTTP_PASS="admin"
+# Ambil credentials dari nvram
+HTTP_USER=$(nvram get http_username 2>/dev/null)
+HTTP_PASS=$(nvram get http_passwd 2>/dev/null)
 
 echo ""
 echo ""
@@ -317,139 +415,172 @@ divider
 echo -e "  ${DIM}Configure credentials for the web login page, SSH, and router admin.${NC}"
 echo -e "  ${DIM}All three will be kept in sync automatically.${NC}"
 echo ""
-echo -e "  Detected credentials  ${DIM}→${NC}  ${WHITE}${HTTP_USER}${NC} / ${DIM}${HTTP_PASS}${NC}"
-echo ""
-printf "  Keep current credentials? [y/n]: "; read use_current < /dev/tty; echo ""
 
-case "$use_current" in
-    n|N)
-        echo -e "  ${CYAN}Set new credentials${NC}"
-        divider
-        echo -e "  ${DIM}Changes will apply to: web login, SSH, and router admin.${NC}"
-        echo -e "  ${DIM}If a new username is set, it will be added as a root-equivalent${NC}"
-        echo -e "  ${DIM}system user (UID 0) and enabled for SSH access. The original${NC}"
-        echo -e "  ${DIM}'root' account will be disabled for SSH login but kept intact${NC}"
-        echo -e "  ${DIM}for system stability.${NC}"
-        echo ""
+if [ "${_FORCE_CREDS:-0}" -eq 1 ]; then
+    # ── FORCE MODE: clean install atau reinstall ─────────────────────────
+    # User WAJIB isi credentials — tidak peduli apakah sudah ada atau tidak
+    echo -e "  ${YELLOW}⚑  Fresh install detected — you must set new credentials.${NC}"
+    echo -e "  ${DIM}  These will be used for web login, SSH, and router admin.${NC}"
+    echo ""
 
-        printf "  Username ${DIM}[leave blank to keep '${HTTP_USER}']${NC}: "
-        read new_user < /dev/tty
-        [ -z "$new_user" ] && new_user="$HTTP_USER"
-
-        printf "  Password ${DIM}[leave blank to keep current]${NC}: "
-        read new_pass < /dev/tty; echo ""
-
-        if [ -z "$new_pass" ]; then
-            warn "No password entered — keeping current password."
-            new_pass="$HTTP_PASS"
+    # ── Username ─────────────────────────────────────────────────────────
+    while true; do
+        printf "  ${WHITE}Username${NC}: "; read new_user < /dev/tty
+        new_user=$(printf '%s' "$new_user" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        if [ -z "$new_user" ]; then
+            warn "Username cannot be empty."
+        elif [ "${#new_user}" -lt 2 ]; then
+            warn "Username too short (minimum 2 characters)."
+        elif printf '%s' "$new_user" | grep -q '[^a-zA-Z0-9_@.-]'; then
+            warn "Username may only contain letters, numbers, and: _ @ . -"
+        else
+            break
         fi
+    done
 
-        HTTP_USER="$new_user"
-        HTTP_PASS="$new_pass"
+    # ── Password ─────────────────────────────────────────────────────────
+    while true; do
+        printf "  ${WHITE}Password${NC}: "; read new_pass < /dev/tty; echo ""
+        new_pass=$(printf '%s' "$new_pass" | tr -d '\r\n')
+        if [ -z "$new_pass" ]; then
+            warn "Password cannot be empty."
+        elif [ "${#new_pass}" -lt 4 ]; then
+            warn "Password too short (minimum 4 characters)."
+        elif [ "$new_pass" = "admin" ] || [ "$new_pass" = "password" ] || \
+             [ "$new_pass" = "1234" ] || [ "$new_pass" = "123456" ]; then
+            warn "Password too weak. Please choose a stronger password."
+        else
+            # Konfirmasi password
+            printf "  ${WHITE}Confirm password${NC}: "; read new_pass2 < /dev/tty; echo ""
+            new_pass2=$(printf '%s' "$new_pass2" | tr -d '\r\n')
+            if [ "$new_pass" != "$new_pass2" ]; then
+                warn "Passwords do not match. Please try again."
+            else
+                break
+            fi
+        fi
+    done
 
-        # Update web admin credentials
-        nvram set http_username="$HTTP_USER"
-        nvram set http_passwd="$HTTP_PASS"
-        nvram commit >/dev/null 2>&1
+    HTTP_USER="$new_user"
+    HTTP_PASS="$new_pass"
+    unset new_pass2
 
-        # Update SSH + system credentials
-        # ── Fungsi apply SSH credentials ──────────────────────────
-        # Fungsi generate password hash tanpa passwd command
-        make_hash() {
-            local pass="$1"
-            local hash=""
-            # Coba openssl dulu
-            hash=$(openssl passwd -1 "$pass" 2>/dev/null)
-            # Fallback ke MD5 via busybox
-            [ -z "$hash" ] && hash=$(echo "$pass" | md5sum 2>/dev/null | awk "{print \$1}")
-            echo "$hash"
-        }
+else
+    # ── OPTIONAL MODE: sudah ada credentials sebelumnya ──────────────────
+    echo -e "  Detected credentials  ${DIM}→${NC}  ${WHITE}${HTTP_USER}${NC} / ${DIM}${HTTP_PASS}${NC}"
+    echo ""
+    printf "  Keep current credentials? [y/n]: "; read use_current < /dev/tty; echo ""
 
-        # Fungsi update /etc/shadow langsung (tidak butuh passwd command)
-        set_shadow_pass() {
-            local uname="$1"
-            local upass="$2"
-            local hash
-            hash=$(make_hash "$upass")
-            [ -z "$hash" ] && return 1
-            # Hapus entry lama, tulis baru
-            grep -v "^${uname}:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
-            echo "${uname}:${hash}:18000:0:99999:7:::" >> /tmp/shadow.tmp
-            cp /tmp/shadow.tmp /etc/shadow
-        }
+    case "$use_current" in
+        n|N)
+            # User ingin ganti — sama seperti force mode tapi boleh blank untuk keep
+            echo -e "  ${CYAN}Set new credentials${NC}"; divider
+            echo -e "  ${DIM}Leave blank to keep current value.${NC}"; echo ""
 
-        setup_ssh_user() {
-            local uname="$1"
-            local upass="$2"
+            printf "  ${WHITE}Username${NC} ${DIM}[${HTTP_USER}]${NC}: "; read new_user < /dev/tty
+            new_user=$(printf '%s' "$new_user" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            [ -z "$new_user" ] && new_user="$HTTP_USER"
 
-            # Tandai untuk restart SSH di akhir script (agar koneksi tidak putus)
-            nvram set sshd_enable=1
-            nvram set sshd_pass=1
-            SSHD_NEEDS_RESTART=1
+            printf "  ${WHITE}Password${NC} ${DIM}[keep current]${NC}: "; read new_pass < /dev/tty; echo ""
+            new_pass=$(printf '%s' "$new_pass" | tr -d '\r\n')
+            [ -z "$new_pass" ] && new_pass="$HTTP_PASS"
 
-            # Update password root di shadow
-            set_shadow_pass "root" "$upass"
-
-            if [ "$uname" = "root" ]; then
-                # Pastikan root shell kembali ke /bin/sh
-                awk 'BEGIN{FS=OFS=":"} /^root:/{$7="/bin/sh"} {print}'                     /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
-                ok "SSH password updated for '${WHITE}root${NC}'"
-                SSH_CUSTOM_USER=""
-                return
+            # Validasi jika user mengisi password baru
+            if [ "$new_pass" != "$HTTP_PASS" ]; then
+                while [ "${#new_pass}" -lt 4 ] || \
+                      [ "$new_pass" = "admin" ] || [ "$new_pass" = "password" ] || \
+                      [ "$new_pass" = "1234" ] || [ "$new_pass" = "123456" ]; do
+                    warn "Password too weak or too short (minimum 4 characters)."
+                    printf "  ${WHITE}Password${NC}: "; read new_pass < /dev/tty; echo ""
+                    new_pass=$(printf '%s' "$new_pass" | tr -d '\r\n')
+                    [ -z "$new_pass" ] && new_pass="$HTTP_PASS" && break
+                done
             fi
 
-            # Cek writable
-            if ! touch /etc/passwd 2>/dev/null; then
-                warn "/etc/passwd is read-only — SSH custom user cannot be created."
-                warn "Web login will use '${uname}', SSH falls back to 'root'."
-                SSH_CUSTOM_USER=""
-                return
-            fi
+            HTTP_USER="$new_user"
+            HTTP_PASS="$new_pass"
+            ;;
+    esac
+fi
 
-            # Hapus entry lama
-            grep -v "^${uname}:" /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
+# ── Dari sini HTTP_USER dan HTTP_PASS sudah final ───────────────────────
+# Terapkan ke nvram, SSH, dan setup SSH user
+nvram set http_username="$HTTP_USER"
+nvram set http_passwd="$HTTP_PASS"
+nvram commit >/dev/null 2>&1
 
-            # Tambah user custom UID 0
-            echo "${uname}:x:0:0::/root:/bin/sh" >> /etc/passwd
+# ── Definisi fungsi SSH helper ─────────────────────────────────────────
+make_hash() {
+    local pass="$1"
+    local hash=""
+    # MD5-crypt: satu-satunya format yang didukung dropbear FreshTomato
+    hash=$(printf '%s' "$pass" | openssl passwd -1 -stdin 2>/dev/null)
+    [ -z "$hash" ] && hash=$(echo "$pass" | md5sum 2>/dev/null | awk "{print \$1}")
+    echo "$hash"
+}
 
-            # Set password di shadow
-            set_shadow_pass "$uname" "$upass"
+set_shadow_pass() {
+    local uname="$1" upass="$2" hash
+    hash=$(make_hash "$upass")
+    [ -z "$hash" ] && return 1
+    grep -v "^${uname}:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
+    echo "${uname}:${hash}:18000:0:99999:7:::" >> /tmp/shadow.tmp
+    cp /tmp/shadow.tmp /etc/shadow
+    rm -f /tmp/shadow.tmp
+}
 
-            # Block root SSH: ganti shell ke /bin/false
-            awk 'BEGIN{FS=OFS=":"} /^root:/{$7="/bin/false"} {print}'                 /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
-
-            ok "SSH user '${WHITE}${uname}${NC}' created → UID 0 (runs as root)"
-            ok "SSH login for 'root' blocked → shell set to /bin/false"
-            SSH_CUSTOM_USER="$uname"
-        }
-
-        setup_ssh_user "$HTTP_USER" "$HTTP_PASS"
-
-        echo ""
-        ok "Credentials applied  →  ${WHITE}${HTTP_USER}${NC} / ${DIM}${HTTP_PASS}${NC}"
-        echo -e "  ${DIM}  Web login ✔   SSH ✔   Router admin ✔${NC}"
-        ;;
-    *)
-        # Keep current — sync password SSH root
-        printf "%s\n%s\n" "$HTTP_PASS" "$HTTP_PASS" | passwd root >/dev/null 2>&1
+setup_ssh_user() {
+    local uname="$1" upass="$2"
+    nvram set sshd_enable=1
+    nvram set sshd_pass=1
+    SSHD_NEEDS_RESTART=1
+    set_shadow_pass "root" "$upass"
+    if [ "$uname" = "root" ]; then
+        awk 'BEGIN{FS=OFS=":"} /^root:/{$7="/bin/sh"} {print}' \
+            /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
+        ok "SSH password updated for '${WHITE}root${NC}'"
         SSH_CUSTOM_USER=""
-        ok "Keeping current credentials  →  ${WHITE}${HTTP_USER}${NC}"
-        echo -e "  ${DIM}  SSH password synced with current credentials.${NC}"
-        ;;
-esac
+        return
+    fi
+    if ! touch /etc/passwd 2>/dev/null; then
+        warn "/etc/passwd is read-only — SSH custom user cannot be created."
+        warn "Web login will use '${uname}', SSH falls back to 'root'."
+        SSH_CUSTOM_USER=""
+        return
+    fi
+    grep -v "^${uname}:" /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
+    echo "${uname}:x:0:0::/root:/bin/sh" >> /etc/passwd
+    set_shadow_pass "$uname" "$upass"
+    awk 'BEGIN{FS=OFS=":"} /^root:/{$7="/bin/false"} {print}' \
+        /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
+    ok "SSH user '${WHITE}${uname}${NC}' created → UID 0 (runs as root)"
+    ok "SSH login for 'root' blocked → shell set to /bin/false"
+    SSH_CUSTOM_USER="$uname"
+}
 
+setup_ssh_user "$HTTP_USER" "$HTTP_PASS"
 SSH_CUSTOM_USER="${SSH_CUSTOM_USER:-}"
 
 echo ""
+ok "Credentials applied  →  ${WHITE}${HTTP_USER}${NC}"
+echo -e "  ${DIM}  Web login ✔   SSH ✔   Router admin ✔${NC}"
+echo ""
 
-echo "${HTTP_USER}:${HTTP_PASS}" > "$INSTALL_PATH/.passwd"
+
+
+echo ""
+
+# Simpan MD5-crypt hash ($1$) ke .passwd — format yang didukung dropbear FreshTomato
+# WAJIB MD5-crypt, BUKAN SHA-512 ($6$): boot restore membaca hash ini dan menulis
+# LANGSUNG ke /etc/shadow tanpa re-hash. Jika SHA-512, dropbear tidak bisa verifikasi.
+_HASH=$(printf '%s' "${HTTP_PASS}" | openssl passwd -1 -stdin 2>/dev/null)
+[ -z "$_HASH" ] && { fail "Cannot hash password — openssl unavailable"; exit 1; }
+printf '%s:%s\n' "${HTTP_USER}" "$_HASH" > "$INSTALL_PATH/.passwd"
+unset _HASH
 chmod 600 "$INSTALL_PATH/.passwd"
+chown root:root "$INSTALL_PATH/.passwd" 2>/dev/null
 
-# Deploy MOTD script
-do_wget "$BASE_URL/motd.sh" "$INSTALL_PATH/motd.sh" 2>/dev/null
-chmod 755 "$INSTALL_PATH/motd.sh" 2>/dev/null
-
-# Simpan informasi theme untuk MOTD
+# Simpan theme info untuk MOTD
 cat > "$INSTALL_PATH/.theme_info" << THEMEEOF
 THEME_NAME=${SELECTED_NAME}
 THEME_FOLDER=${SELECTED_FOLDER}
@@ -457,24 +588,105 @@ THEME_SCRIPT=${VIDEO_SCRIPT}
 INSTALLED_DATE=$(date "+%Y-%m-%d %H:%M")
 THEMEEOF
 
-# Buat auth.cgi
+# Download motd.sh dari GitHub
+printf "        ${DIM}%-22s${NC} " "motd.sh"
+do_wget "$BASE_URL/motd.sh" "$INSTALL_PATH/motd.sh"
+if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/motd.sh" ]; then
+    chmod 755 "$INSTALL_PATH/motd.sh"
+    SIZE=$(ls -lh "$INSTALL_PATH/motd.sh" | awk '{print $5}')
+    echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
+else
+    echo -e "${DIM}skipped${NC}"
+fi
+
+# Sync nvram http_passwd — dipakai FreshTomato preinit restore shadow saat boot
+nvram set http_passwd="${HTTP_PASS}"
+nvram set http_username="${HTTP_USER}"
+nvram commit >/dev/null 2>&1
+
+# Buat auth.cgi — di-generate langsung (tidak di-pull GitHub)
 cat > "$INSTALL_PATH/auth.cgi" << 'AUTHEOF'
 #!/bin/sh
 printf "Content-Type: text/plain\r\n\r\n"
+
+# ── Rate limiting per-IP: max 10 req / 60 detik ──────────────────
+LOCK_DIR="/tmp/ft_auth_rl"
+mkdir -p "$LOCK_DIR"
+CLIENT_IP="${REMOTE_ADDR:-unknown}"
+SAFE_IP=$(printf '%s' "$CLIENT_IP" | tr -cd 'a-fA-F0-9.:_-' | cut -c1-45)
+[ -z "$SAFE_IP" ] && SAFE_IP="unknown"
+RL_FILE="$LOCK_DIR/$SAFE_IP"
+NOW=$(date +%s)
+if [ -f "$RL_FILE" ]; then
+    FIRST=$(head -1 "$RL_FILE" 2>/dev/null)
+    COUNT=$(wc -l < "$RL_FILE" 2>/dev/null); COUNT=${COUNT:-0}
+    if [ -n "$FIRST" ] && [ $((NOW - FIRST)) -gt 60 ]; then
+        rm -f "$RL_FILE"; COUNT=0
+    elif [ "$COUNT" -gt 10 ]; then
+        printf "FAIL"; exit 0
+    fi
+fi
+[ ! -f "$RL_FILE" ] && printf '%s\n' "$NOW" > "$RL_FILE" || printf '%s\n' "$NOW" >> "$RL_FILE"
+
+# ── URL decode ────────────────────────────────────────────────────
+url_decode() {
+    printf '%s' "$1" | sed 's/+/ /g' | awk '
+    BEGIN { for(i=0;i<256;i++) hex[sprintf("%02x",i)]=sprintf("%c",i) }
+    { while(match($0,/%[0-9A-Fa-f][0-9A-Fa-f]/)) {
+        code=tolower(substr($0,RSTART+1,2))
+        $0=substr($0,1,RSTART-1) hex[code] substr($0,RSTART+RLENGTH) }
+      print }'
+}
+
 POST=$(cat)
-USER=$(echo "$POST" | sed 's/&/\n/g' | grep '^user=' | cut -d= -f2-)
-PASS=$(echo "$POST" | sed 's/&/\n/g' | grep '^pass=' | cut -d= -f2-)
+USER_RAW=$(printf '%s' "$POST" | sed 's/&/\n/g' | grep '^user=' | head -1 | cut -d= -f2-)
+PASS_RAW=$(printf '%s' "$POST" | sed 's/&/\n/g' | grep '^pass=' | head -1 | cut -d= -f2-)
+USER=$(url_decode "$USER_RAW")
+PASS=$(url_decode "$PASS_RAW")
+
+# ── Validasi input ────────────────────────────────────────────────
+SAFE_USER=$(printf '%s' "$USER" | tr -cd 'a-zA-Z0-9_@.-' | cut -c1-64)
+[ -z "$USER" ] || [ -z "$PASS" ] || [ "$SAFE_USER" != "$USER" ] && { printf "FAIL"; exit 0; }
+PASS_LEN=$(printf '%s' "$PASS" | wc -c)
+[ "$PASS_LEN" -eq 0 ] || [ "$PASS_LEN" -gt 128 ] && { printf "FAIL"; exit 0; }
+
+# ── Baca stored credentials ───────────────────────────────────────
+# .passwd berisi hash ($6$ atau $1$), bukan plaintext
 CRED=$(cat /jffs/Theme/www/.passwd 2>/dev/null || cat /www/.passwd 2>/dev/null)
 STORED_U="${CRED%%:*}"
-STORED_P="${CRED#*:}"
-if [ -n "$USER" ] && [ "$USER" = "$STORED_U" ] && [ "$PASS" = "$STORED_P" ]; then
-    TOKEN=$(date +%s)$$
+STORED_HASH="${CRED#*:}"
+
+# ── Verifikasi username ───────────────────────────────────────────
+U_OK=0
+[ "${#USER}" -eq "${#STORED_U}" ] && [ "$USER" = "$STORED_U" ] && U_OK=1
+
+# ── Verifikasi password via hash ──────────────────────────────────
+# Support $6$ (SHA-512) dan $1$ (MD5-crypt)
+P_OK=0
+if [ "$U_OK" -eq 1 ] && [ -n "$STORED_HASH" ]; then
+    ALGO=$(printf '%s' "$STORED_HASH" | cut -d'$' -f2)
+    SALT=$(printf '%s' "$STORED_HASH" | cut -d'$' -f3)
+    case "$ALGO" in 6) OPT="-6" ;; 1) OPT="-1" ;; *) OPT="" ;; esac
+    if [ -n "$OPT" ] && [ -n "$SALT" ]; then
+        COMPUTED=$(printf '%s' "$PASS" | openssl passwd "$OPT" -salt "$SALT" -stdin 2>/dev/null)
+        [ -n "$COMPUTED" ] && [ "${#COMPUTED}" -eq "${#STORED_HASH}" ] && \
+            [ "$COMPUTED" = "$STORED_HASH" ] && P_OK=1
+    fi
+fi
+
+if [ "$U_OK" -eq 1 ] && [ "$P_OK" -eq 1 ]; then
+    # Token 32-byte hex dari /dev/urandom
+    TOKEN=$(cat /dev/urandom 2>/dev/null | head -c 32 | od -An -tx1 | tr -d ' \n')
+    [ -z "$TOKEN" ] && TOKEN="$(date +%s)$(cat /proc/sys/kernel/random/entropy_avail 2>/dev/null)$$"
+    rm -f "$RL_FILE"
     printf "OK:%s" "$TOKEN"
 else
+    sleep 1
     printf "FAIL"
 fi
 AUTHEOF
-chmod 755 "$INSTALL_PATH/auth.cgi"
+chmod 750 "$INSTALL_PATH/auth.cgi"
+chown root:root "$INSTALL_PATH/auth.cgi" 2>/dev/null
 
 # Buat index.html
 cat > "$INSTALL_PATH/index.html" << 'IDXEOF'
@@ -495,8 +707,7 @@ if [ "$HAS_NGINX" -eq 1 ] && [ -s "$INSTALL_PATH/login.html" ]; then
     sleep 2
 
     # Buat dirs
-    mkdir -p "$BASE_DIR"
-mkdir -p "$NGINX_PATH/static"
+    mkdir -p "$BASE_DIR" "$NGINX_PATH/static"
     mkdir -p /var/log/nginx /var/lib/nginx/client /var/lib/nginx/proxy
 
     # Salin static files ke nginx/static (TANPA .asp)
@@ -512,7 +723,6 @@ mkdir -p "$NGINX_PATH/static"
     # mime.types
     cat > "$NGINX_PATH/mime.types" << 'MIMEEOF'
 types {
-    text/html                 html htm;
     text/css                  css;
     text/plain                txt;
     application/javascript    js;
@@ -527,26 +737,77 @@ types {
 }
 MIMEEOF
 
-    # nginx.conf — pakai cookie ft_auth untuk cek session
+    # nginx.conf — security hardened + performance tuned untuk router
+    # Kompatibel dengan semua 96 .asp dan 5 .jsx dari /www FreshTomato
     cat > "$NGINX_PATH/nginx.conf" << NGINXEOF
 user root root;
 worker_processes 1;
 pid /tmp/nginx.pid;
-error_log /tmp/nginx_error.log;
+error_log /tmp/nginx_error.log warn;
 
-events { worker_connections 128; }
+events {
+    worker_connections 64;
+    use epoll;
+    multi_accept on;
+}
 
 http {
+    server_tokens off;
     access_log off;
+    default_type text/html;
     include $NGINX_PATH/mime.types;
 
-    proxy_connect_timeout 10s;
-    proxy_send_timeout    60s;
-    proxy_read_timeout    60s;
-    proxy_buffer_size     128k;
-    proxy_buffers         8 128k;
-    proxy_busy_buffers_size 256k;
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 15s;
+    keepalive_requests 100;
 
+    # Upstream keepalive ke httpd:8008
+    upstream httpd_upstream {
+        server $LAN_IP:8008 max_fails=3 fail_timeout=10s;
+        keepalive 2;
+        keepalive_timeout 10s;
+        keepalive_requests 50;
+    }
+
+    # Proxy settings — buffer kecil untuk router dengan RAM terbatas
+    proxy_connect_timeout  5s;
+    proxy_send_timeout     15s;
+    proxy_read_timeout     30s;
+    proxy_buffer_size      4k;
+    proxy_buffers          4 8k;
+    proxy_busy_buffers_size 16k;
+    proxy_temp_path        /tmp/nginx_proxy 1 2;
+    proxy_next_upstream    error timeout http_502 http_503;
+    proxy_next_upstream_tries 2;
+    proxy_next_upstream_timeout 8s;
+
+    # Gzip — hemat bandwidth
+    gzip on;
+    gzip_min_length 512;
+    gzip_comp_level 2;
+    # text/plain penting untuk update.cgi (log data bisa ratusan KB, kompres 80-90%)
+    gzip_types text/css text/plain application/javascript application/json image/svg+xml;
+    gzip_vary on;
+    # KRITIS: aktifkan gzip untuk response dari upstream (httpd:8008)
+    # Tanpa ini gzip TIDAK aktif untuk .asp, update.cgi, dll — hanya file statis
+    gzip_proxied any;
+
+    # Rate limit zones
+    limit_req_zone \$binary_remote_addr zone=login:512k rate=5r/m;
+    limit_req_zone \$binary_remote_addr zone=api:512k   rate=30r/s;
+
+    # Cache zone untuk update.cgi polling (log, bandwidth, dll)
+    # FreshTomato default refresh = 1 detik, log bisa ratusan KB per poll
+    # Cache 2 detik: browser poll 1x/detik tapi httpd hanya dipanggil 1x/2detik
+    # max_size=2m: cukup untuk beberapa exec= types, inactive=3s: auto-evict
+    proxy_cache_path /tmp/nginx_log_cache levels=1 keys_zone=log_cache:512k max_size=2m inactive=3s use_temp_path=off;
+
+    # Map X-Login-Auth header dari login.html → Authorization ke httpd
+    # login.html kirim X-Login-Auth: Basic base64(user:pass)
+    # nginx teruskan sebagai Authorization: Basic base64(user:pass)
+    # Semua .asp FreshTomato butuh header ini untuk autentikasi httpd
     map \$http_x_login_auth \$auth_header {
         default       "Basic $B64";
         "~^Basic .+"  \$http_x_login_auth;
@@ -556,40 +817,56 @@ http {
         listen 80;
         root $NGINX_PATH/static;
 
-        # Logout
-        location ~* logout {
+        # Security headers untuk semua response
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+
+        # Block dotfiles (.passwd, dll)
+        location ~ /\. { deny all; return 404; }
+
+        # Block PHP — adminer.php dan phpinfo.php ada di /www, berbahaya jika diakses
+        location ~* \.php$ { deny all; return 404; }
+
+        # Logout — intercept semua URL yang mengandung /logout
+        # logout.asp di /www tetap ada tapi nginx clear cookie dulu
+        location ~* ^.*/logout(\.asp)?$ {
             add_header Set-Cookie "ft_auth=; Path=/; Max-Age=0; SameSite=Lax" always;
             return 302 /login.html?logout=1;
         }
 
-        # Login page
+        # Login page — rate limited, no cache
         location = /login.html {
+            limit_req zone=login burst=10 nodelay;
             add_header Cache-Control "no-store, no-cache, must-revalidate" always;
             add_header Pragma "no-cache" always;
             try_files \$uri =404;
         }
 
-        # Root "/" — cek cookie, proxy atau login
+        # Root "/" — cek cookie, proxy atau redirect ke login
         location = / {
             set \$do_login "1";
             if (\$cookie_ft_auth) { set \$do_login "0"; }
             if (\$do_login = "1") { rewrite ^ /login.html last; }
-            proxy_pass http://$LAN_IP:8008;
+            proxy_pass http://httpd_upstream;
             proxy_set_header Authorization \$auth_header;
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
             proxy_http_version 1.1;
             proxy_set_header Connection "";
-            proxy_buffering on;
         }
 
-        # bgmp4.gif sebagai video
+        # bgmp4.gif — serve sebagai video/mp4 dengan cache panjang
         location = /bgmp4.gif {
-            types { video/mp4 gif; }
+            default_type video/mp4;
+            add_header Cache-Control "public, max-age=86400, immutable" always;
+            add_header Accept-Ranges bytes always;
             try_files \$uri =404;
         }
 
-        # reboot-wait.html & halt-wait.html — hanya jika sudah login
+        # reboot-wait.html & halt-wait.html — HARUS sebelum *.html generic
+        # Hanya bisa diakses jika sudah ada cookie ft_auth
         location ~ ^/(reboot|halt)-wait\.html$ {
             set \$rw_auth "0";
             if (\$cookie_ft_auth) { set \$rw_auth "1"; }
@@ -598,43 +875,111 @@ http {
             try_files \$uri =404;
         }
 
-        # /tomato.cgi & /shutdown.cgi — hanya jika sudah login
-        location ~ ^/(tomato|shutdown)\.cgi$ {
-            set \$cgi_auth "0";
-            if (\$cookie_ft_auth) { set \$cgi_auth "1"; }
-            if (\$cgi_auth = "0") { return 403; }
-            proxy_pass http://$LAN_IP:8008;
+        # status-log.asp — optimized untuk log polling
+        # Masalah: user set refresh 1 detik, tiap poll bisa kirim ratusan KB log
+        # proxy_buffering off (sebelumnya) = nginx block sampai semua data diterima
+        # Fix: buffering ON + buffer besar (32k) + gzip text/plain + timeout wajar
+        # Ini juga berlaku untuk update.cgi (exec=showlog) yang dipakai TomatoRefresh
+        location = /status-log.asp {
+            limit_req zone=api burst=50 nodelay;
+            proxy_pass http://httpd_upstream;
             proxy_set_header Authorization \$auth_header;
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
             proxy_http_version 1.1;
             proxy_set_header Connection "";
-            proxy_buffering on;
+            proxy_read_timeout     60s;
+            proxy_send_timeout     60s;
+            # Buffer log response di nginx dulu, baru kirim ke client sekaligus
+            proxy_buffering        on;
+            proxy_buffer_size      8k;
+            proxy_buffers          8 32k;
+            proxy_busy_buffers_size 64k;
+            proxy_cache            off;
         }
 
-        # Static files
-        location ~* \.(css|js|png|jpg|jpeg|ico|svg|woff|woff2|html)$ {
+        # update.cgi — endpoint polling SEMUA halaman realtime FreshTomato
+        # POST body berisi exec= parameter: showlog, netdev, bandwidth, dll
+        # Default FreshTomato: 1 detik refresh → ratusan KB per detik
+        # Fix: cache response 2 detik per-user per-exec-type
+        #   → browser boleh poll 1x/detik tapi httpd hanya dipanggil 1x/2detik
+        #   → beban httpd turun 50%, response terasa lebih cepat (dari cache)
+        location = /update.cgi {
+            # Baca request body SEBELUM proxy — butuh untuk cache key
+            proxy_pass_request_body on;
+
+            # Cache POST response — key = user identity + exec type
+            proxy_cache            log_cache;
+            proxy_cache_methods    POST;
+            proxy_cache_key        "\$http_authorization:\$request_body";
+            proxy_cache_valid      200 2s;
+            proxy_cache_valid      any 0s;
+            # Abaikan Cache-Control dari httpd yang mungkin set no-cache
+            proxy_ignore_headers   Cache-Control Expires Set-Cookie;
+            # Lock: jika cache miss, hanya 1 request ke httpd — sisanya tunggu
+            proxy_cache_lock       on;
+            proxy_cache_lock_timeout 3s;
+            # Header cache status (untuk debug: HIT/MISS/BYPASS)
+            add_header X-Cache-Status \$upstream_cache_status always;
+
+            proxy_pass http://httpd_upstream;
+            proxy_set_header Authorization \$auth_header;
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_read_timeout     30s;
+            proxy_send_timeout     15s;
+            proxy_buffering        on;
+            proxy_buffer_size      8k;
+            proxy_buffers          8 32k;
+            proxy_busy_buffers_size 64k;
+        }
+
+        # Static assets — cache 10 menit
+        location ~* \.(css|js|png|jpg|jpeg|ico|svg|woff|woff2|gif)$ {
+            add_header Cache-Control "public, max-age=600" always;
             try_files \$uri @proxy;
         }
 
-        # Semua lain → proxy
-        location / {
-            proxy_pass http://$LAN_IP:8008;
+        # HTML statis — no cache
+        location ~* \.html$ {
+            add_header Cache-Control "no-store, no-cache, must-revalidate" always;
+            try_files \$uri @proxy;
+        }
+
+        # .asp, .jsx, dan .cgi — semua dari /www lewat httpd
+        # .cgi bisa ada di ext/cgi-bin atau user/cgi-bin
+        location ~* \.(asp|jsx|cgi)$ {
+            limit_req zone=api burst=50 nodelay;
+            proxy_pass http://httpd_upstream;
             proxy_set_header Authorization \$auth_header;
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
             proxy_http_version 1.1;
             proxy_set_header Connection "";
-            proxy_buffering on;
         }
 
-        location @proxy {
-            proxy_pass http://$LAN_IP:8008;
+        # Semua lain → proxy ke httpd:8008
+        location / {
+            proxy_pass http://httpd_upstream;
             proxy_set_header Authorization \$auth_header;
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
-            proxy_buffering on;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
         }
+
+        location @proxy {
+            proxy_pass http://httpd_upstream;
+            proxy_set_header Authorization \$auth_header;
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+        }
+
+        error_page 401 403 404 /login.html;
     }
 }
 NGINXEOF
@@ -685,7 +1030,7 @@ BOOTEOF2
 # File permanen tersimpan di /jffs dan di-restore di sini
 # =================================================================
 
-# 1. MOUNT: bind /jffs/Theme/www → /www dan /jffs/Theme/etc → /etc
+# 1. MOUNT: bind Theme/www → /www dan Theme/etc → /etc
 [ -d "$SAFE_PATH" ] || exit 0
 mount | grep -q "$SAFE_PATH" || mount --bind "$SAFE_PATH" /www
 mount | grep -q "$SAFE_ETC"  || mount --bind "$SAFE_ETC"  /etc
@@ -704,6 +1049,7 @@ sleep 2
 
 # 4. NGINX: start ulang dengan config dari JFFS
 mkdir -p /var/log/nginx /var/lib/nginx/client /var/lib/nginx/proxy
+mkdir -p /tmp/nginx_log_cache  # cache zone untuk update.cgi polling
 PORT80_PID=$(netstat -tlnp 2>/dev/null | grep ':80 ' | awk '{print $7}' | cut -d/ -f1 | head -1)
 [ -n "$PORT80_PID" ] && kill -9 "$PORT80_PID" 2>/dev/null && sleep 1
 pkill -9 nginx 2>/dev/null
@@ -730,28 +1076,31 @@ _U=$(cut -d: -f1 "$_F" 2>/dev/null)
 _P=$(cut -d: -f2- "$_F" 2>/dev/null)
 
 if [ -n "$_P" ]; then
-    _H=$(openssl passwd -1 "$_P" 2>/dev/null)
-    if [ -n "$_H" ]; then
-        # Restore password root
-        grep -v "^root:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
-        echo "root:${_H}:18000:0:99999:7:::" >> /tmp/shadow.tmp
+    # _P adalah MD5-crypt hash ($1$) dari .passwd — tulis LANGSUNG ke shadow
+    # JANGAN re-hash: openssl passwd -1 dari hash = hash-dari-hash = password salah
+    # .passwd sudah berisi hash yang siap pakai untuk /etc/shadow
+    _H="$_P"
+    # Restore password root
+    grep -v "^root:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
+    echo "root:${_H}:18000:0:99999:7:::" >> /tmp/shadow.tmp
+    cp /tmp/shadow.tmp /etc/shadow
+    rm -f /tmp/shadow.tmp
+
+    if [ -n "$_U" ] && [ "$_U" != "root" ]; then
+        # Re-create custom user UID 0 di /etc/passwd
+        grep -v "^${_U}:" /etc/passwd > /tmp/passwd.tmp 2>/dev/null || cp /etc/passwd /tmp/passwd.tmp
+        echo "${_U}:x:0:0::/root:/bin/sh" >> /tmp/passwd.tmp
+        cp /tmp/passwd.tmp /etc/passwd
+
+        # Set password custom user di shadow (hash sama dengan root)
+        grep -v "^${_U}:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
+        echo "${_U}:${_H}:18000:0:99999:7:::" >> /tmp/shadow.tmp
         cp /tmp/shadow.tmp /etc/shadow
+        rm -f /tmp/shadow.tmp
 
-        if [ -n "$_U" ] && [ "$_U" != "root" ]; then
-            # Re-create custom user UID 0 di /etc/passwd
-            grep -v "^${_U}:" /etc/passwd > /tmp/passwd.tmp 2>/dev/null || cp /etc/passwd /tmp/passwd.tmp
-            echo "${_U}:x:0:0::/root:/bin/sh" >> /tmp/passwd.tmp
-            cp /tmp/passwd.tmp /etc/passwd
-
-            # Set password custom user di shadow
-            grep -v "^${_U}:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
-            echo "${_U}:${_H}:18000:0:99999:7:::" >> /tmp/shadow.tmp
-            cp /tmp/shadow.tmp /etc/shadow
-
-            # Block root SSH: shell → /bin/false
-            awk 'BEGIN{FS=OFS=":"} /^root:/{$7="/bin/false"} {print}' \
-                /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
-        fi
+        # Block root SSH: shell → /bin/false
+        awk 'BEGIN{FS=OFS=":"} /^root:/{$7="/bin/false"} {print}' \
+            /etc/passwd > /tmp/passwd.tmp && cp /tmp/passwd.tmp /etc/passwd
     fi
 fi
 
@@ -760,8 +1109,34 @@ nvram set sshd_enable=1
 nvram set sshd_pass=1
 service sshd restart >/dev/null 2>&1
 
-# 8. MOTD: generate login banner — tulis ke /jffs/Theme/etc/motd
-#    (setelah mount --bind, /etc/motd otomatis terbaca dari sini)
+# 8. FINAL SHADOW RESTORE
+# FreshTomato preinit kadang override /etc/shadow dari nvram http_passwd
+# setelah boot.sh kita selesai. Gunakan hash yang sudah kita simpan di .passwd
+# (MD5-crypt, langsung tulis ke shadow) bukan dari nvram plaintext.
+# nvram http_passwd bisa berisi plaintext tapi re-hash setiap boot buang waktu.
+_FF="$SAFE_PATH/.passwd"
+_FU=$(cut -d: -f1 "$_FF" 2>/dev/null)
+_FH=$(cut -d: -f2- "$_FF" 2>/dev/null)
+if [ -n "$_FH" ]; then
+    # Tulis hash langsung ke shadow — no re-hash
+    grep -v "^root:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
+    echo "root:${_FH}:18000:0:99999:7:::" >> /tmp/shadow.tmp
+    cp /tmp/shadow.tmp /etc/shadow
+    # Juga restore custom user jika ada
+    if [ -n "$_FU" ] && [ "$_FU" != "root" ]; then
+        grep -v "^${_FU}:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
+        echo "${_FU}:${_FH}:18000:0:99999:7:::" >> /tmp/shadow.tmp
+        cp /tmp/shadow.tmp /etc/shadow
+    fi
+    rm -f /tmp/shadow.tmp
+    # Restart dropbear agar baca shadow terbaru
+    killall -9 dropbear 2>/dev/null
+    sleep 1
+    service sshd start >/dev/null 2>&1
+fi
+unset _FF _FU _FH
+
+# 9. MOTD: generate login banner fresh setiap boot
 if [ -x "$SAFE_PATH/motd.sh" ]; then
     "$SAFE_PATH/motd.sh" > "$SAFE_ETC/motd" 2>/dev/null
 fi
@@ -772,17 +1147,20 @@ BOOTEOF3
 
 else
     # Fallback tanpa nginx — buat boot.sh minimal
-    mkdir -p "$NGINX_PATH"
-    cat > "$NGINX_PATH/boot.sh" << FALLBACKEOF
+    mkdir -p "$BASE_DIR" "$NGINX_PATH"
+    cat > "$BASE_DIR/boot.sh" << FALLBACKEOF
 #!/bin/sh
 SAFE_PATH=$SAFE_PATH
+SAFE_ETC=/jffs/Theme/etc
 SAFE_SCRIPT=$SAFE_SCRIPT
 [ -d "\$SAFE_PATH" ] || exit 0
-mount | grep -q "\$SAFE_PATH" || { mount --bind "\$SAFE_PATH" /www && service httpd restart; }
+mount | grep -q "\$SAFE_PATH" || mount --bind "\$SAFE_PATH" /www
+mount | grep -q "\$SAFE_ETC"  || mount --bind "\$SAFE_ETC"  /etc
+service httpd restart
 grep -q "\$SAFE_SCRIPT" "\$SAFE_PATH/tomato.js" 2>/dev/null || \
     printf 'document.addEventListener("DOMContentLoaded",function(){var s=document.createElement("script");s.src="/%s";document.head.appendChild(s);});\n' \
     "\$SAFE_SCRIPT" >> "\$SAFE_PATH/tomato.js"
-[ -x "\$SAFE_PATH/motd.sh" ] && "\$SAFE_PATH/motd.sh" > /etc/motd 2>/dev/null
+[ -x "\$SAFE_PATH/motd.sh" ] && "\$SAFE_PATH/motd.sh" > "\$SAFE_ETC/motd" 2>/dev/null
 FALLBACKEOF
     chmod 755 "$BASE_DIR/boot.sh"
 
@@ -799,8 +1177,9 @@ fi
 BOOT_ENTRY="sh /jffs/Theme/boot.sh"
 MARKER_START="# --- FreshTomato Theme ---"
 MARKER_END="# --- End FreshTomato Theme ---"
+# sleep 25: tunggu FreshTomato preinit selesai (~15-20s) sebelum boot.sh jalan
 BOOT_BLOCK="$MARKER_START
-sleep 10
+sleep 25
 $BOOT_ENTRY
 $MARKER_END"
 
@@ -834,12 +1213,10 @@ nvram commit >/dev/null 2>&1
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
-# MOTD: generate sekali setelah install
+# MOTD: generate sekali setelah install selesai
 # =================================================================
 if [ -x "$INSTALL_PATH/motd.sh" ]; then
-    # Tulis ke Theme/etc/motd (akan aktif saat boot setelah bind mount)
     "$INSTALL_PATH/motd.sh" > "$ETC_PATH/motd" 2>/dev/null
-    # Tulis ke /etc/motd langsung untuk session install ini (tmpfs, selalu writable)
     cat "$ETC_PATH/motd" > /etc/motd 2>/dev/null
     ok "MOTD ready  →  ${DIM}$ETC_PATH/motd${NC}"
 fi
