@@ -151,6 +151,7 @@ if [ -d "$INSTALL_PATH" ] && [ "$(ls -A $INSTALL_PATH 2>/dev/null)" ]; then
 
             # 6. Hapus semua file instalasi
             printf "        ${DIM}%-30s${NC} " "removing install files"
+            umount -l /etc 2>/dev/null; sleep 1
             rm -rf "$BASE_DIR"
             rm -f /tmp/ft_reboot_now /tmp/ft_reboot_log 2>/dev/null
             echo -e "${BGREEN}done${NC}"
@@ -168,6 +169,7 @@ else
     rm -f /tmp/nginx.pid 2>/dev/null
     sleep 1
     umount -l /www 2>/dev/null; sleep 1
+    umount -l /etc 2>/dev/null; sleep 1
     [ -d "$BASE_DIR" ] && rm -rf "$BASE_DIR"
     rm -f /tmp/ft_reboot_now /tmp/ft_reboot_log 2>/dev/null
 fi
@@ -181,17 +183,12 @@ echo -e "${BGREEN}done${NC}"
 echo -ne "        ${DIM}Mirroring /etc to JFFS...           ${NC}  "
 mkdir -p "$ETC_PATH"
 cp -a /etc/. "$ETC_PATH/" 2>/dev/null
-# Pastikan semua direktori dan file writable (cp -a bisa bawa attr read-only dari source)
+# Pastikan semua direktori dan file writable
 chmod 755 "$ETC_PATH"
 find "$ETC_PATH" -type d -exec chmod 755 {} \; 2>/dev/null
 find "$ETC_PATH" -type f -exec chmod u+w {} \; 2>/dev/null
-# Mount --bind Theme/etc → /etc sekarang, verifikasi berhasil
-if ! mount | grep -q "$ETC_PATH"; then
-    mount --bind "$ETC_PATH" /etc
-    if ! mount | grep -q "$ETC_PATH"; then
-        warn "/etc bind mount failed — MOTD will not persist across reboots"
-    fi
-fi
+# CATATAN: mount --bind /etc hanya dilakukan di boot.sh, BUKAN di sini
+# Alasan: saat reinstall /etc bisa hilang jika di-bind mount lalu di-umount
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
@@ -527,7 +524,6 @@ MIMEEOF
 
     # nginx.conf — pakai cookie ft_auth untuk cek session
     cat > "$NGINX_PATH/nginx.conf" << NGINXEOF
-user root;
 worker_processes 1;
 pid /tmp/nginx.pid;
 error_log /tmp/nginx_error.log;
@@ -835,9 +831,10 @@ echo -e "${BGREEN}done${NC}"
 # MOTD: generate sekali setelah install
 # =================================================================
 if [ -x "$INSTALL_PATH/motd.sh" ]; then
-    # Tulis ke Theme/etc/motd (permanen) DAN /etc/motd (session ini)
+    # Tulis ke Theme/etc/motd (akan aktif saat boot setelah bind mount)
     "$INSTALL_PATH/motd.sh" > "$ETC_PATH/motd" 2>/dev/null
-    "$INSTALL_PATH/motd.sh" > /etc/motd 2>/dev/null
+    # Tulis ke /etc/motd langsung untuk session install ini (tmpfs, selalu writable)
+    cat "$ETC_PATH/motd" > /etc/motd 2>/dev/null
     ok "MOTD ready  →  ${DIM}$ETC_PATH/motd${NC}"
 fi
 

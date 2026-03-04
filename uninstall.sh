@@ -100,6 +100,7 @@ echo -e "${BGREEN}done${NC}"
 # STEP 3: UNMOUNT /www
 # =================================================================
 echo -ne "  ${CYAN}[3/7]${NC}  Restoring /www and /etc mounts...        "
+# Umount /etc lebih dulu agar /etc kembali ke tmpfs sebelum hapus Theme/etc
 umount -l /etc 2>/dev/null
 sleep 1
 umount -l /www 2>/dev/null
