@@ -180,7 +180,9 @@ echo -e "${BGREEN}done${NC}"
 
 echo -ne "        ${DIM}Mirroring /etc to JFFS...           ${NC}  "
 mkdir -p "$ETC_PATH"
-cp -a /etc/. "$ETC_PATH/"
+cp -a /etc/. "$ETC_PATH/" 2>/dev/null
+# Pastikan /jffs/Theme/etc writable (source /etc bisa read-only)
+chmod -R u+w "$ETC_PATH" 2>/dev/null
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
