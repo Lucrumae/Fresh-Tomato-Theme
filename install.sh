@@ -9,7 +9,6 @@ LIST_FILE="ThemeList.txt"
 BASE_DIR="/jffs/Theme"
 INSTALL_PATH="/jffs/Theme/www"
 NGINX_PATH="/jffs/Theme/nginx"
-ETC_PATH="/jffs/Theme/etc"
 TEMP_WORKSPACE="/tmp/theme_deploy"
 THEME_FILES="default.css logol.png logor.png bgmp4.gif"
 
@@ -151,7 +150,6 @@ if [ -d "$INSTALL_PATH" ] && [ "$(ls -A $INSTALL_PATH 2>/dev/null)" ]; then
 
             # 6. Hapus semua file instalasi
             printf "        ${DIM}%-30s${NC} " "removing install files"
-            umount -l /etc 2>/dev/null; sleep 1
             rm -rf "$BASE_DIR"
             rm -f /tmp/ft_reboot_now /tmp/ft_reboot_log 2>/dev/null
             echo -e "${BGREEN}done${NC}"
@@ -172,7 +170,6 @@ else
     rm -f /tmp/nginx.pid 2>/dev/null
     sleep 1
     umount -l /www 2>/dev/null; sleep 1
-    umount -l /etc 2>/dev/null; sleep 1
     [ -d "$BASE_DIR" ] && rm -rf "$BASE_DIR"
     rm -f /tmp/ft_reboot_now /tmp/ft_reboot_log 2>/dev/null
 fi
@@ -284,17 +281,6 @@ fi
 
 echo -e "${BGREEN}done${NC}"
 
-echo -ne "        ${DIM}Mirroring /etc to JFFS...           ${NC}  "
-mkdir -p "$ETC_PATH"
-# cp -a /etc/. untuk copy ISI /etc (bukan symlink /etc itu sendiri)
-cp -a /etc/. "$ETC_PATH/" 2>/dev/null
-# chmod -R 777 agar semua file writable meski source read-only
-chmod -R 777 "$ETC_PATH" 2>/dev/null
-# Buat motd writable dan kosong (akan diisi motd.sh)
-touch "$ETC_PATH/motd"
-chmod 666 "$ETC_PATH/motd"
-echo -e "${BGREEN}done${NC}"
-
 # =================================================================
 # PHASE 4: DOWNLOAD
 # =================================================================
@@ -339,7 +325,7 @@ done
 
 # login.html — pull dari GitHub
 printf "        ${DIM}%-22s${NC} " "login.html"
-mkdir -p "$NGINX_PATH/static"
+mkdir -p "$BASE_DIR" "$NGINX_PATH/static"
 do_wget "$BASE_URL/login.html" "$INSTALL_PATH/login.html"
 if [ $? -ne 0 ] || [ ! -s "$INSTALL_PATH/login.html" ]; then
     echo -e "${RED}failed${NC}"
@@ -578,26 +564,6 @@ printf '%s:%s\n' "${HTTP_USER}" "$_HASH" > "$INSTALL_PATH/.passwd"
 unset _HASH
 chmod 600 "$INSTALL_PATH/.passwd"
 chown root:root "$INSTALL_PATH/.passwd" 2>/dev/null
-
-# Simpan theme info untuk MOTD
-cat > "$INSTALL_PATH/.theme_info" << THEMEEOF
-THEME_NAME=${SELECTED_NAME}
-THEME_FOLDER=${SELECTED_FOLDER}
-THEME_SCRIPT=${VIDEO_SCRIPT}
-INSTALLED_DATE=$(date "+%Y-%m-%d %H:%M")
-THEMEEOF
-
-# Download motd.sh dari GitHub
-printf "        ${DIM}%-22s${NC} " "motd.sh"
-do_wget "$BASE_URL/motd.sh" "$INSTALL_PATH/motd.sh"
-if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/motd.sh" ]; then
-    chmod 755 "$INSTALL_PATH/motd.sh"
-    SIZE=$(ls -lh "$INSTALL_PATH/motd.sh" | awk '{print $5}')
-    echo -e "${BGREEN}done${NC} ${DIM}($SIZE)${NC}"
-else
-    echo -e "${DIM}skipped${NC}"
-fi
-
 # Sync nvram http_passwd — dipakai FreshTomato preinit restore shadow saat boot
 nvram set http_passwd="${HTTP_PASS}"
 nvram set http_username="${HTTP_USER}"
@@ -706,7 +672,7 @@ if [ "$HAS_NGINX" -eq 1 ] && [ -s "$INSTALL_PATH/login.html" ]; then
     sleep 2
 
     # Buat dirs
-    mkdir -p "$BASE_DIR" "$NGINX_PATH/static"
+    mkdir -p "$NGINX_PATH/static"
     mkdir -p /var/log/nginx /var/lib/nginx/client /var/lib/nginx/proxy
 
     # Salin static files ke nginx/static (TANPA .asp)
@@ -1014,7 +980,6 @@ NGINXEOF
 #!/bin/sh
 SAFE_PATH=/jffs/Theme/www
 SAFE_NGINX=/jffs/Theme/nginx
-SAFE_ETC=/jffs/Theme/etc
 BOOTEOF
 
     # Append bagian yang butuh variable expansion
@@ -1029,10 +994,9 @@ BOOTEOF2
 # File permanen tersimpan di /jffs dan di-restore di sini
 # =================================================================
 
-# 1. MOUNT: bind Theme/www → /www dan Theme/etc → /etc
+# 1. MOUNT: bind /jffs/Theme/www → /www agar theme aktif
 [ -d "$SAFE_PATH" ] || exit 0
 mount | grep -q "$SAFE_PATH" || mount --bind "$SAFE_PATH" /www
-mount | grep -q "$SAFE_ETC"  || mount --bind "$SAFE_ETC"  /etc
 
 # 2. THEME SCRIPT: pastikan video/adaptive script ter-inject ke tomato.js
 if [ -f "$SAFE_PATH/tomato.js" ] && [ -n "$SAFE_SCRIPT" ]; then
@@ -1134,11 +1098,6 @@ if [ -n "$_FH" ]; then
     service sshd start >/dev/null 2>&1
 fi
 unset _FF _FU _FH
-
-# 9. MOTD: generate login banner fresh setiap boot
-if [ -x "$SAFE_PATH/motd.sh" ]; then
-    "$SAFE_PATH/motd.sh" > "$SAFE_ETC/motd" 2>/dev/null
-fi
 BOOTEOF3
     chmod 755 "$BASE_DIR/boot.sh"
 
@@ -1150,16 +1109,12 @@ else
     cat > "$BASE_DIR/boot.sh" << FALLBACKEOF
 #!/bin/sh
 SAFE_PATH=$SAFE_PATH
-SAFE_ETC=/jffs/Theme/etc
 SAFE_SCRIPT=$SAFE_SCRIPT
 [ -d "\$SAFE_PATH" ] || exit 0
-mount | grep -q "\$SAFE_PATH" || mount --bind "\$SAFE_PATH" /www
-mount | grep -q "\$SAFE_ETC"  || mount --bind "\$SAFE_ETC"  /etc
-service httpd restart
+mount | grep -q "\$SAFE_PATH" || { mount --bind "\$SAFE_PATH" /www && service httpd restart; }
 grep -q "\$SAFE_SCRIPT" "\$SAFE_PATH/tomato.js" 2>/dev/null || \
     printf 'document.addEventListener("DOMContentLoaded",function(){var s=document.createElement("script");s.src="/%s";document.head.appendChild(s);});\n' \
     "\$SAFE_SCRIPT" >> "\$SAFE_PATH/tomato.js"
-[ -x "\$SAFE_PATH/motd.sh" ] && "\$SAFE_PATH/motd.sh" > "\$SAFE_ETC/motd" 2>/dev/null
 FALLBACKEOF
     chmod 755 "$BASE_DIR/boot.sh"
 
@@ -1210,15 +1165,6 @@ fi
 nvram commit >/dev/null 2>&1
 
 echo -e "${BGREEN}done${NC}"
-
-# =================================================================
-# MOTD: generate sekali setelah install selesai
-# =================================================================
-if [ -x "$INSTALL_PATH/motd.sh" ]; then
-    "$INSTALL_PATH/motd.sh" > "$ETC_PATH/motd" 2>/dev/null
-    cat "$ETC_PATH/motd" > /etc/motd 2>/dev/null
-    ok "MOTD ready  →  ${DIM}$ETC_PATH/motd${NC}"
-fi
 
 # =================================================================
 # DONE
