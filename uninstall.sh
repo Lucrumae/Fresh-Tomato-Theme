@@ -5,8 +5,9 @@
 # Menghapus semua perubahan dan mengembalikan router ke kondisi awal
 # =================================================================
 
-INSTALL_PATH="/jffs/mywww"
-NGINX_PATH="/jffs/nginx"
+BASE_DIR="/jffs/Theme"
+INSTALL_PATH="/jffs/Theme/www"
+NGINX_PATH="/jffs/Theme/nginx"
 LAN_IP=$(nvram get lan_ipaddr 2>/dev/null)
 [ -z "$LAN_IP" ] && LAN_IP="192.168.1.1"
 
@@ -98,7 +99,9 @@ echo -e "${BGREEN}done${NC}"
 # =================================================================
 # STEP 3: UNMOUNT /www
 # =================================================================
-echo -ne "  ${CYAN}[3/7]${NC}  Restoring /www mount...                 "
+echo -ne "  ${CYAN}[3/7]${NC}  Restoring /www and /etc mounts...        "
+umount -l /etc 2>/dev/null
+sleep 1
 umount -l /www 2>/dev/null
 sleep 1
 if mount | grep -q "$INSTALL_PATH"; then
@@ -167,11 +170,7 @@ echo -e "${BGREEN}done${NC}"
 # STEP 6: REMOVE THEME FILES
 # =================================================================
 echo -ne "  ${CYAN}[6/7]${NC}  Removing theme files...                 "
-rm -rf "$INSTALL_PATH" 2>/dev/null
-rm -rf "$NGINX_PATH" 2>/dev/null
-rm -rf /tmp/ft_auth_rl 2>/dev/null
-rm -rf /tmp/nginx_proxy 2>/dev/null
-rm -rf /tmp/nginx_log_cache 2>/dev/null
+rm -rf "$BASE_DIR" 2>/dev/null
 rm -f /tmp/ft_reboot_now /tmp/ft_reboot_log 2>/dev/null
 rm -f /tmp/nginx.pid /tmp/nginx_error.log 2>/dev/null
 echo -e "${BGREEN}done${NC}"
@@ -189,7 +188,7 @@ if [ "$RESET_CREDS" = "1" ]; then
     nvram set http_passwd="admin"
     nvram commit >/dev/null 2>&1
     # Update /etc/shadow untuk SSH
-    _H=$(printf '%s' "admin" | openssl passwd -1 -stdin 2>/dev/null)
+    _H=$(openssl passwd -1 "admin" 2>/dev/null)
     if [ -n "$_H" ]; then
         grep -v "^root:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
         echo "root:${_H}:18000:0:99999:7:::" >> /tmp/shadow.tmp

@@ -6,8 +6,10 @@
 BASE_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main"
 THEME_URL="https://raw.githubusercontent.com/Lucrumae/Fresh-Tomato-Theme/main/Theme"
 LIST_FILE="ThemeList.txt"
-INSTALL_PATH="/jffs/mywww"
-NGINX_PATH="/jffs/nginx"
+BASE_DIR="/jffs/Theme"
+INSTALL_PATH="/jffs/Theme/www"
+NGINX_PATH="/jffs/Theme/nginx"
+ETC_PATH="/jffs/Theme/etc"
 TEMP_WORKSPACE="/tmp/theme_deploy"
 THEME_FILES="default.css logol.png logor.png bgmp4.gif"
 
@@ -149,8 +151,7 @@ if [ -d "$INSTALL_PATH" ] && [ "$(ls -A $INSTALL_PATH 2>/dev/null)" ]; then
 
             # 6. Hapus semua file instalasi
             printf "        ${DIM}%-30s${NC} " "removing install files"
-            rm -rf "$INSTALL_PATH"
-            rm -rf "$NGINX_PATH"
+            rm -rf "$BASE_DIR"
             rm -f /tmp/ft_reboot_now /tmp/ft_reboot_log 2>/dev/null
             echo -e "${BGREEN}done${NC}"
 
@@ -167,7 +168,7 @@ else
     rm -f /tmp/nginx.pid 2>/dev/null
     sleep 1
     umount -l /www 2>/dev/null; sleep 1
-    [ -d "$NGINX_PATH" ] && rm -rf "$NGINX_PATH"
+    [ -d "$BASE_DIR" ] && rm -rf "$BASE_DIR"
     rm -f /tmp/ft_reboot_now /tmp/ft_reboot_log 2>/dev/null
 fi
 
@@ -175,6 +176,11 @@ echo -ne "  ${CYAN}[2/5]${NC}  Mirroring /www to JFFS...               "
 mkdir -p "$INSTALL_PATH"
 cp -a /www/. "$INSTALL_PATH/"
 rm -f "$INSTALL_PATH/default.css"
+echo -e "${BGREEN}done${NC}"
+
+echo -ne "        ${DIM}Mirroring /etc to JFFS...           ${NC}  "
+mkdir -p "$ETC_PATH"
+cp -a /etc/. "$ETC_PATH/"
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
@@ -221,6 +227,7 @@ done
 
 # login.html — pull dari GitHub
 printf "        ${DIM}%-22s${NC} " "login.html"
+mkdir -p "$BASE_DIR"
 mkdir -p "$NGINX_PATH/static"
 do_wget "$BASE_URL/login.html" "$INSTALL_PATH/login.html"
 if [ $? -ne 0 ] || [ ! -s "$INSTALL_PATH/login.html" ]; then
@@ -441,7 +448,7 @@ printf "Content-Type: text/plain\r\n\r\n"
 POST=$(cat)
 USER=$(echo "$POST" | sed 's/&/\n/g' | grep '^user=' | cut -d= -f2-)
 PASS=$(echo "$POST" | sed 's/&/\n/g' | grep '^pass=' | cut -d= -f2-)
-CRED=$(cat /jffs/mywww/.passwd 2>/dev/null || cat /www/.passwd 2>/dev/null)
+CRED=$(cat /jffs/Theme/www/.passwd 2>/dev/null || cat /www/.passwd 2>/dev/null)
 STORED_U="${CRED%%:*}"
 STORED_P="${CRED#*:}"
 if [ -n "$USER" ] && [ "$USER" = "$STORED_U" ] && [ "$PASS" = "$STORED_P" ]; then
@@ -472,7 +479,8 @@ if [ "$HAS_NGINX" -eq 1 ] && [ -s "$INSTALL_PATH/login.html" ]; then
     sleep 2
 
     # Buat dirs
-    mkdir -p "$NGINX_PATH/static"
+    mkdir -p "$BASE_DIR"
+mkdir -p "$NGINX_PATH/static"
     mkdir -p /var/log/nginx /var/lib/nginx/client /var/lib/nginx/proxy
 
     # Salin static files ke nginx/static (TANPA .asp)
@@ -642,14 +650,15 @@ NGINXEOF
     service httpd restart >/dev/null 2>&1
 
     # Tulis boot script sebagai file (menghindari masalah quoting di NVRAM)
-    cat > "$NGINX_PATH/boot.sh" << 'BOOTEOF'
+    cat > "$BASE_DIR/boot.sh" << 'BOOTEOF'
 #!/bin/sh
-SAFE_PATH=/jffs/mywww
-SAFE_NGINX=/jffs/nginx
+SAFE_PATH=/jffs/Theme/www
+SAFE_NGINX=/jffs/Theme/nginx
+SAFE_ETC=/jffs/Theme/etc
 BOOTEOF
 
     # Append bagian yang butuh variable expansion
-    cat >> "$NGINX_PATH/boot.sh" << BOOTEOF2
+    cat >> "$BASE_DIR/boot.sh" << BOOTEOF2
 SAFE_SCRIPT=$SAFE_SCRIPT
 BOOTEOF2
 
@@ -660,9 +669,10 @@ BOOTEOF2
 # File permanen tersimpan di /jffs dan di-restore di sini
 # =================================================================
 
-# 1. MOUNT: bind /jffs/mywww → /www agar theme aktif
+# 1. MOUNT: bind /jffs/Theme/www → /www dan /jffs/Theme/etc → /etc
 [ -d "$SAFE_PATH" ] || exit 0
 mount | grep -q "$SAFE_PATH" || mount --bind "$SAFE_PATH" /www
+mount | grep -q "$SAFE_ETC"  || mount --bind "$SAFE_ETC"  /etc
 
 # 2. THEME SCRIPT: pastikan video/adaptive script ter-inject ke tomato.js
 if [ -f "$SAFE_PATH/tomato.js" ] && [ -n "$SAFE_SCRIPT" ]; then
@@ -698,7 +708,7 @@ fi
 [ -f "$SAFE_PATH/halt-wait.html" ] && cp "$SAFE_PATH/halt-wait.html" "$SAFE_NGINX/static/halt-wait.html" 2>/dev/null
 
 # 6. SSH CREDENTIALS: /etc/passwd + /etc/shadow di-reset tiap boot dari tmpfs
-#    restore dari .passwd yang tersimpan permanen di /jffs/mywww
+#    restore dari .passwd yang tersimpan permanen di /jffs/Theme/www
 _F="$SAFE_PATH/.passwd"
 _U=$(cut -d: -f1 "$_F" 2>/dev/null)
 _P=$(cut -d: -f2- "$_F" 2>/dev/null)
@@ -734,12 +744,13 @@ nvram set sshd_enable=1
 nvram set sshd_pass=1
 service sshd restart >/dev/null 2>&1
 
-# 8. MOTD: generate login banner dari theme info
+# 8. MOTD: generate login banner — tulis ke /jffs/Theme/etc/motd
+#    (setelah mount --bind, /etc/motd otomatis terbaca dari sini)
 if [ -x "$SAFE_PATH/motd.sh" ]; then
-    "$SAFE_PATH/motd.sh" > /etc/motd 2>/dev/null
+    "$SAFE_PATH/motd.sh" > "$SAFE_ETC/motd" 2>/dev/null
 fi
 BOOTEOF3
-    chmod 755 "$NGINX_PATH/boot.sh"
+    chmod 755 "$BASE_DIR/boot.sh"
 
     LOGIN_STATUS="${BGREEN}Custom login page (nginx)${NC}"
 
@@ -757,7 +768,7 @@ grep -q "\$SAFE_SCRIPT" "\$SAFE_PATH/tomato.js" 2>/dev/null || \
     "\$SAFE_SCRIPT" >> "\$SAFE_PATH/tomato.js"
 [ -x "\$SAFE_PATH/motd.sh" ] && "\$SAFE_PATH/motd.sh" > /etc/motd 2>/dev/null
 FALLBACKEOF
-    chmod 755 "$NGINX_PATH/boot.sh"
+    chmod 755 "$BASE_DIR/boot.sh"
 
     mount --bind "$INSTALL_PATH" /www
     service httpd restart >/dev/null 2>&1
@@ -769,7 +780,7 @@ fi
 # INJECT KE script_init — hanya satu baris, semua logic di boot.sh
 # Preserve semua konfigurasi custom user yang sudah ada di init
 # =================================================================
-BOOT_ENTRY="sh $SAFE_NGINX/boot.sh"
+BOOT_ENTRY="sh /jffs/Theme/boot.sh"
 MARKER_START="# --- FreshTomato Theme ---"
 MARKER_END="# --- End FreshTomato Theme ---"
 BOOT_BLOCK="$MARKER_START
@@ -810,8 +821,9 @@ echo -e "${BGREEN}done${NC}"
 # MOTD: generate sekali setelah install
 # =================================================================
 if [ -x "$INSTALL_PATH/motd.sh" ]; then
-    "$INSTALL_PATH/motd.sh" > /etc/motd 2>/dev/null
-    ok "MOTD generated  →  ${DIM}/etc/motd${NC}"
+    "$INSTALL_PATH/motd.sh" > "$ETC_PATH/motd" 2>/dev/null
+    mount | grep -q "$ETC_PATH" || mount --bind "$ETC_PATH" /etc
+    ok "MOTD ready  →  ${DIM}$ETC_PATH/motd${NC}"
 fi
 
 # =================================================================
@@ -820,7 +832,7 @@ fi
 echo ""; divider; echo ""
 echo -e "  ${BGREEN}✔  Installation complete!${NC}"; echo ""
 echo -e "  ${WHITE}Theme   ${NC}${PINK}$SELECTED_NAME${NC}"
-echo -e "  ${WHITE}Path    ${NC}${DIM}$INSTALL_PATH${NC}"
+echo -e "  ${WHITE}Path    ${NC}${DIM}$BASE_DIR${NC}"
 echo -e "  ${WHITE}Script  ${NC}${DIM}$VIDEO_SCRIPT${NC}"
 echo -e "  ${WHITE}Login   ${NC}$LOGIN_STATUS"
 echo -e "  ${WHITE}Status  ${NC}${BGREEN}Active & persistent${NC}"

@@ -17,7 +17,7 @@ RD='\033[0;31m'
 BL='\033[0;34m'
 
 # --- Load theme info ---
-INFO_FILE="/jffs/mywww/.theme_info"
+INFO_FILE="/jffs/Theme/www/.theme_info"
 THEME_NAME="Unknown"
 THEME_SCRIPT="bg-video.js"
 INSTALLED_DATE="-"
