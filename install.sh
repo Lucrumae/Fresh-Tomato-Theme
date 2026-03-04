@@ -317,7 +317,6 @@ echo -e "${BGREEN}done${NC}"
 echo -ne "        ${DIM}Mirroring /rom/etc to JFFS...       ${NC}  "
 mkdir -p "$ETC_PATH"
 cp -a /rom/etc/. "$ETC_PATH/" 2>/dev/null
-mount | grep -q "$ETC_PATH" || mount --bind /rom/etc "$ETC_PATH"
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
@@ -1037,8 +1036,7 @@ BOOTEOF2
 # 1. MOUNT: bind /jffs/Theme/www → /www agar theme aktif
 [ -d "$SAFE_PATH" ] || exit 0
 mount | grep -q "$SAFE_PATH" || mount --bind "$SAFE_PATH" /www
-# Sinkronkan /rom/etc → Theme/etc agar file asli selalu tersedia
-mount | grep -q "$SAFE_ETC"  || mount --bind /rom/etc "$SAFE_ETC"
+# /jffs/Theme/etc sudah berisi copy dari /rom/etc sejak install
 
 # 2. THEME SCRIPT: pastikan video/adaptive script ter-inject ke tomato.js
 if [ -f "$SAFE_PATH/tomato.js" ] && [ -n "$SAFE_SCRIPT" ]; then
@@ -1155,7 +1153,7 @@ SAFE_ETC=/jffs/Theme/etc
 SAFE_SCRIPT=$SAFE_SCRIPT
 [ -d "\$SAFE_PATH" ] || exit 0
 mount | grep -q "\$SAFE_PATH" || mount --bind "\$SAFE_PATH" /www
-mount | grep -q "\$SAFE_ETC"  || mount --bind /rom/etc "\$SAFE_ETC"
+
 service httpd restart
 grep -q "\$SAFE_SCRIPT" "\$SAFE_PATH/tomato.js" 2>/dev/null || \
     printf 'document.addEventListener("DOMContentLoaded",function(){var s=document.createElement("script");s.src="/%s";document.head.appendChild(s);});\n' \
@@ -1256,16 +1254,18 @@ echo -e "  ${YELLOW}⚑  Press Ctrl+F5 to clear browser cache.${NC}"
 echo ""; divider; echo ""
 
 if [ "${SSHD_NEEDS_RESTART:-0}" = "1" ]; then
-    echo -e "  ${YELLOW}⚠  SSH Service Restart${NC}"
+    echo -e "  ${YELLOW}⚠  SSH Credentials Updated${NC}"
     divider
-    echo -e "  ${DIM}New SSH credentials have been applied. The SSH daemon${NC}"
-    echo -e "  ${DIM}must restart to apply changes — your current session${NC}"
-    echo -e "  ${DIM}will be disconnected in 3 seconds.${NC}"
+    echo -e "  ${DIM}New credentials applied. Starting fresh SSH daemon${NC}"
+    echo -e "  ${DIM}without disconnecting your current session.${NC}"
     echo ""
-    echo -e "  ${WHITE}Reconnect using:${NC}"
+    echo -e "  ${WHITE}Reconnect (new session) using:${NC}"
     echo -e "  ${CYAN}  ssh ${HTTP_USER}@${LAN_IP}${NC}"
     echo ""; divider; echo ""
-    sleep 3
     nvram commit >/dev/null 2>&1
-    service sshd restart >/dev/null 2>&1
+    # Jalankan dropbear baru di background — koneksi aktif tidak di-drop
+    # Dropbear lama tetap jalan untuk session ini, instance baru untuk koneksi berikutnya
+    nvram set sshd_enable=1
+    nvram set sshd_pass=1
+    ( sleep 2; killall -9 dropbear 2>/dev/null; sleep 1; service sshd start >/dev/null 2>&1 ) &
 fi
