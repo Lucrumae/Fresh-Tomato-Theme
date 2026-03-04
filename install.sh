@@ -318,11 +318,12 @@ fi
 
 echo -e "${BGREEN}done${NC}"
 
-echo -ne "        ${DIM}Mirroring /rom/etc to JFFS...       ${NC}  "
-mkdir -p "$ETC_PATH"
+echo -ne "        ${DIM}Preparing Theme/etc...              ${NC}  "
 umount -l "$ETC_PATH" 2>/dev/null
 sleep 1
-cp -a /rom/etc/. "$ETC_PATH/" 2>/dev/null
+mkdir -p "$ETC_PATH"
+# Buat motd baru yang benar-benar writable (bukan copy dari /rom/etc yang read-only)
+printf '' > "$ETC_PATH/motd"
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
@@ -1241,13 +1242,7 @@ printf "${DM}  │${NC}  ${WH}Engine   ${DM}%s${NC}\n" "$VIDEO_SCRIPT"
 printf "${DM}  │${NC}  ${WH}Installed${DM}%s${NC}\n" "$_D"
 printf "${DM}  └──────────────────────────────────────────────────${NC}\n\n"
 printf "${DM}  ssh %s@%s${NC}\n\n" "$_U" "$LAN_IP"
-} > "$ETC_PATH/motd" 2>/dev/null || {
-    # Jika masih read-only, chmod file motd saja lalu coba lagi
-    chmod u+w "$ETC_PATH/motd" 2>/dev/null
-    chmod u+w "$ETC_PATH" 2>/dev/null
-    printf "${PK}  ╔══════════════════════════════════════════════════╗\n  ║   ${WH}⚡ FreshTomato Theme  ${DM}by Lucrumae${PK}              ║\n  ╚══════════════════════════════════════════════════╝${NC}\n\n${DM}  ┌─ Theme ──────────────────────────────────────────${NC}\n${DM}  │${NC}  ${WH}Name     ${PK}%s${NC}\n${DM}  └──────────────────────────────────────────────────${NC}\n\n${DM}  ssh %s@%s${NC}\n\n" \
-        "$SELECTED_NAME" "$_U" "$LAN_IP" > "$ETC_PATH/motd" 2>/dev/null
-}
+} > "$ETC_PATH/motd"
 ok "MOTD ready  →  ${DIM}$ETC_PATH/motd${NC}"
 unset _R _F _D _CC _CM _U PK WH CY DM NC
 
