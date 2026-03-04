@@ -182,13 +182,18 @@ echo -e "${BGREEN}done${NC}"
 
 echo -ne "        ${DIM}Mirroring /etc to JFFS...           ${NC}  "
 mkdir -p "$ETC_PATH"
-cp -a /etc/. "$ETC_PATH/" 2>/dev/null
-# Pastikan semua direktori dan file writable
+# Copy SELEKTIF — hanya file yang dibutuhkan untuk persistensi
+# Tidak cp -a /etc seluruhnya karena banyak symlink + file read-only dari tmpfs
+for _f in passwd shadow group gshadow hosts hostname resolv.conf TZ localtime; do
+    [ -f "/etc/$_f" ] && cp "/etc/$_f" "$ETC_PATH/$_f" 2>/dev/null
+done
+# Buat motd kosong yang writable
+touch "$ETC_PATH/motd" 2>/dev/null
+# Pastikan semua writable
 chmod 755 "$ETC_PATH"
-find "$ETC_PATH" -type d -exec chmod 755 {} \; 2>/dev/null
-find "$ETC_PATH" -type f -exec chmod u+w {} \; 2>/dev/null
-# CATATAN: mount --bind /etc hanya dilakukan di boot.sh, BUKAN di sini
-# Alasan: saat reinstall /etc bisa hilang jika di-bind mount lalu di-umount
+chmod 644 "$ETC_PATH"/* 2>/dev/null
+chmod 640 "$ETC_PATH/shadow" 2>/dev/null
+# CATATAN: mount --bind /etc hanya dilakukan di boot.sh (setiap reboot)
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
@@ -524,6 +529,7 @@ MIMEEOF
 
     # nginx.conf — pakai cookie ft_auth untuk cek session
     cat > "$NGINX_PATH/nginx.conf" << NGINXEOF
+user root root;
 worker_processes 1;
 pid /tmp/nginx.pid;
 error_log /tmp/nginx_error.log;
