@@ -286,14 +286,13 @@ echo -e "${BGREEN}done${NC}"
 
 echo -ne "        ${DIM}Mirroring /etc to JFFS...           ${NC}  "
 mkdir -p "$ETC_PATH"
-# Copy selektif — hanya file yang dibutuhkan, hindari symlink/special files
-for _f in passwd shadow group gshadow hosts hostname resolv.conf TZ localtime; do
-    [ -f "/etc/$_f" ] && cp "/etc/$_f" "$ETC_PATH/$_f" 2>/dev/null
-done
+# cp -a /etc/. untuk copy ISI /etc (bukan symlink /etc itu sendiri)
+cp -a /etc/. "$ETC_PATH/" 2>/dev/null
+# chmod -R 777 agar semua file writable meski source read-only
+chmod -R 777 "$ETC_PATH" 2>/dev/null
+# Buat motd writable dan kosong (akan diisi motd.sh)
 touch "$ETC_PATH/motd"
-chmod 755 "$ETC_PATH"
-chmod 644 "$ETC_PATH"/* 2>/dev/null
-chmod 640 "$ETC_PATH/shadow" 2>/dev/null
+chmod 666 "$ETC_PATH/motd"
 echo -e "${BGREEN}done${NC}"
 
 # =================================================================
