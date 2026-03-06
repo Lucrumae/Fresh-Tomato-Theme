@@ -1,5 +1,5 @@
 /* =================================================================
-   Theme Material Black AMOLED — True Pitch Black UI
+   Theme Material Black AMOLED ï¿½ True Pitch Black UI
    Pure black surfaces, high contrast text, subtle blue accent.
    ================================================================= */
 
@@ -119,11 +119,10 @@ a:hover              { color: var(--link-hover-color) !important; }
 #navi a {
     color: var(--text-secondary) !important;
     font-weight: 600 !important;
-    transition: transform var(--transition-speed) ease,
                 color var(--transition-speed) ease;
 }
 
-#navi a:hover   { transform: translateX(4px); color: var(--accent-secondary) !important; }
+#navi a:hover   { color: var(--accent-secondary) !important; }
 #navi a.indent1 { color: var(--accent-secondary) !important; font-weight: 700 !important; }
 
 /* Typography */
