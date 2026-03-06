@@ -1,0 +1,296 @@
+/* =================================================================
+   Theme Golden Hours — Sleepy Train at Dusk
+   Warm amber interior, overgrown with vines, a cat asleep on the seat.
+   Inspired by the quiet beauty of an abandoned train at golden hour.
+   ================================================================= */
+
+:root {
+
+    /* ┌─────────────────────────────────────────────────────────┐
+       │                        LOGOS                            │
+       └─────────────────────────────────────────────────────────┘ */
+    --logo-left:  url('logol.png');   /* logo on the left side of header  */
+    --logo-right: url('logor.png');   /* logo on the right side of header */
+    --size-left:  auto 25px;          /* size of left logo  (width height) */
+    --size-right: auto 45px;          /* size of right logo (width height) */
+
+
+    /* ┌─────────────────────────────────────────────────────────┐
+       │                    BACKGROUNDS                          │
+       │  rgba(R, G, B, opacity) — 0.0 transparent, 1.0 opaque  │
+       └─────────────────────────────────────────────────────────┘ */
+    --bg-fallback: #2a1506;                    /* deep amber shown before video loads        */
+    --panel-bg:    rgba(30, 15, 5, 0.55);       /* main panels — dark amber glass             */
+    --header-bg:   rgba(20, 8, 2, 0.75);        /* header — deep dark brown                   */
+    --log-bg:      rgba(255, 245, 210, 0.90);  /* logs & code blocks — parchment             */
+    --bwm-bg:      rgba(255, 220, 160, 0.20);  /* bandwidth graph area                       */
+    --tab-bg:      rgba(20, 8, 2, 0.60);        /* bandwidth tabs                             */
+
+
+    /* ┌─────────────────────────────────────────────────────────┐
+       │                   TEXT COLORS                           │
+       └─────────────────────────────────────────────────────────┘ */
+    --text-primary:   #f5e6cc;   /* main body text — warm cream                */
+    --text-secondary: #d4a96a;   /* sidebar links & table labels — golden sand */
+    --text-value:     #ffe8b0;   /* table values — warm amber yellow           */
+    --log-color:      #2a1200;   /* text inside logs & code blocks             */
+    --tab-text:       #f5e6cc;   /* text inside bandwidth tabs                 */
+
+
+    /* ┌─────────────────────────────────────────────────────────┐
+       │                  ACCENT COLORS                          │
+       └─────────────────────────────────────────────────────────┘ */
+    --accent-primary:   #7a4a1e;   /* borders & dividers — aged wood brown     */
+    --accent-secondary: #ff8c2a;   /* section titles & categories — bright ember */
+    --accent-highlight: #ffb347;   /* hover states — golden flame              */
+
+
+    /* ┌─────────────────────────────────────────────────────────┐
+       │                     LINKS                               │
+       └─────────────────────────────────────────────────────────┘ */
+    --link-color:       #8bc34a;   /* resting link — bright leaf green         */
+    --link-hover-color: #e8860a;   /* hover link — golden flame                */
+
+
+    /* ┌─────────────────────────────────────────────────────────┐
+       │                    BUTTONS                              │
+       └─────────────────────────────────────────────────────────┘ */
+    --btn-bg:    #7a4a1e;   /* button background — aged wood              */
+    --btn-color: #fff8ee;   /* button text — warm white                   */
+
+
+    /* ┌─────────────────────────────────────────────────────────┐
+       │               PROGRESS BAR (CPU / RAM / NVRAM)          │
+       └─────────────────────────────────────────────────────────┘ */
+    --progress-color: #4caf50;   /* fill color — normal green */
+
+
+    /* ┌─────────────────────────────────────────────────────────┐
+       │                   INPUT FIELDS                          │
+       └─────────────────────────────────────────────────────────┘ */
+    --input-bg:     rgba(255, 240, 210, 0.70);   /* warm parchment background */
+    --input-color:  #2a1200;                     /* dark brown text           */
+    --input-border: rgba(120, 70, 20, 0.35);     /* warm wood border          */
+
+
+    /* ┌─────────────────────────────────────────────────────────┐
+       │              BANDWIDTH CHART (SVG)                      │
+       └─────────────────────────────────────────────────────────┘ */
+    --svg-text-color:  #7a4a1e;              /* axis labels — warm bark brown  */
+    --svg-grid-stroke: rgba(120, 70, 20, 0.2); /* grid lines — subtle wood     */
+    --bwm-border:      rgba(120, 70, 20, 0.20); /* borders around graph areas  */
+    --svg-bg:          rgba(30, 15, 5, 0.75);    /* SVG graph background (rect inside graph) */
+    --tab-active-bg:   rgba(196, 92, 0, 0.30);  /* active tab highlight        */
+
+
+    /* ┌─────────────────────────────────────────────────────────┐
+       │                TABLE ROW ALTERNATING                    │
+       └─────────────────────────────────────────────────────────┘ */
+    --row-even: rgba(255, 210, 140, 0.15);   /* even row tint — warm amber  */
+    --row-odd:  rgba(180, 100, 30, 0.08);    /* odd row tint — subtle ember */
+
+
+    /* ┌─────────────────────────────────────────────────────────┐
+       │                   SCROLLBAR                             │
+       └─────────────────────────────────────────────────────────┘ */
+    --scrollbar-track: rgba(120, 70, 20, 0.12);   /* track background    */
+    --scrollbar-thumb: rgba(122, 74, 30, 0.55);   /* handle — warm wood  */
+    --scrollbar-hover: rgba(196, 92,  0, 0.80);   /* handle hover — ember */
+
+
+    /* ┌─────────────────────────────────────────────────────────┐
+       │                TRANSITION SPEED                         │
+       └─────────────────────────────────────────────────────────┘ */
+    --transition-speed: 0.22s;
+
+}
+
+/* ================================================================= */
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(3px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cpuEmberPulse {
+    0%   { filter: hue-rotate(0deg)   brightness(1.1) saturate(1.2); }
+    50%  { filter: hue-rotate(15deg)  brightness(1.3) saturate(1.5); }
+    100% { filter: hue-rotate(0deg)   brightness(1.1) saturate(1.2); }
+}
+
+html { background-color: var(--bg-fallback) !important; }
+body { background: none !important; animation: fadeIn 0.6s ease-out; }
+
+#bg-video {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    z-index: -1;
+    object-fit: cover;
+    object-position: center center;
+    pointer-events: none;
+}
+
+/* Panels */
+#container, #content, .section, .fields, fieldset, .box, .content,
+.message, .tomato-grid, .bwmg, .data-table, table, tbody, thead, tr, td, th {
+    background: var(--panel-bg) !important;
+    text-shadow: none !important;
+    border-color: rgba(120, 70, 20, 0.2) !important;
+}
+
+/* Header */
+#header {
+    background-color: var(--header-bg) !important;
+    border-bottom: 2px solid var(--accent-primary) !important;
+    box-shadow: 0 2px 12px rgba(180, 90, 20, 0.4) !important;
+    height: 70px !important;
+    background-image: var(--logo-left), var(--logo-right) !important;
+    background-repeat: no-repeat, no-repeat !important;
+    background-position: left 20px center, right 20px center !important;
+    background-size: var(--size-left), var(--size-right) !important;
+}
+
+#header .title, #header .version { display: none !important; }
+
+/* Links */
+a, a:link, a:visited { color: var(--link-color) !important; }
+a:hover              { color: var(--link-hover-color) !important; }
+
+/* Sidebar */
+#navi {
+    background: var(--panel-bg) !important;
+    border-right: 2px solid var(--accent-primary) !important;
+    padding-right: 10px !important;
+}
+
+#navi a {
+    color: var(--text-secondary) !important;
+    font-weight: 700 !important;
+    transition: transform var(--transition-speed) ease,
+                color var(--transition-speed) ease;
+}
+
+#navi a:hover   { transform: translateX(5px); color: var(--accent-highlight) !important; }
+#navi a.indent1 { color: var(--accent-secondary) !important; font-weight: bold !important; }
+
+/* Typography */
+body, div, p, li, label, .message, .content {
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+}
+
+td:first-child, th   { color: var(--text-secondary) !important; font-weight: 700 !important; }
+td:not(:first-child) { color: var(--text-value) !important; }
+
+.section-title, legend, .message b, h1, h2, h3, h4 {
+    color: var(--accent-secondary) !important;
+    font-weight: bold !important;
+    letter-spacing: 0.02em !important;
+}
+
+/* Table rows */
+tr:nth-child(even) td { background: var(--row-even) !important; }
+tr:nth-child(odd)  td { background: var(--row-odd)  !important; }
+tr:nth-child(even)    { background: var(--row-even) !important; }
+tr:nth-child(odd)     { background: var(--row-odd)  !important; }
+
+/* Buttons */
+input[type="button"], input[type="submit"] {
+    background: var(--btn-bg) !important;
+    border: none !important;
+    color: var(--btn-color) !important;
+    font-weight: 600 !important;
+    border-radius: 4px !important;
+    transition: opacity var(--transition-speed) ease,
+                transform var(--transition-speed) ease;
+}
+input[type="button"]:hover, input[type="submit"]:hover {
+    opacity: 0.85;
+    transform: translateY(-1px);
+}
+
+/* Input fields */
+input[type="text"], input[type="password"], input[type="checkbox"],
+select, textarea {
+    background: var(--input-bg) !important;
+    color: var(--input-color) !important;
+    border: 1px solid var(--input-border) !important;
+    border-radius: 3px !important;
+}
+option { background: var(--input-bg) !important; color: var(--input-color) !important; }
+
+/* Progress bar */
+div.progress-bar { background-color: var(--progress-color) !important; }
+td.content:has(div.progress-wrapper) {
+    animation: cpuEmberPulse 3s ease-in-out infinite !important;
+}
+
+/* Logs & code */
+pre, code, .log, #syslog, textarea {
+    background: var(--log-bg) !important;
+    color: var(--log-color) !important;
+    border: 1px solid var(--bwm-border) !important;
+}
+
+/* Bandwidth */
+#bwm-graph, .bwm-graph, #chart, .chart, canvas, svg {
+    background: var(--bwm-bg) !important;
+    border: 1px solid var(--bwm-border) !important;
+}
+
+.tab, .tabs, ul.tabs, ul.tabs li,
+.ui-tabs, .ui-tabs-nav, .ui-tabs-nav li,
+.ui-widget, .ui-widget-content, .ui-widget-header {
+    background: var(--tab-bg) !important;
+    border-color: var(--bwm-border) !important;
+    color: var(--tab-text) !important;
+}
+
+.ui-tabs-nav li.ui-tabs-active,
+.ui-tabs-nav li:hover { background: var(--tab-active-bg) !important; }
+
+.bwm-stats, .bwm-footer, .tstats {
+    background: var(--tab-bg) !important;
+    color: var(--tab-text) !important;
+}
+
+/* SVG chart */
+.svg-rect { fill: var(--svg-bg) !important; }
+svg { background: transparent !important; }
+svg text, svg tspan { fill: var(--svg-text-color) !important; font-weight: 600 !important; }
+svg line, svg path.grid { stroke: var(--svg-grid-stroke) !important; }
+
+/* --- BANDWIDTH DAILY / WEEKLY / MONTHLY TABLE FIX --- */
+#bwm-daily, #bwm-weekly, #bwm-monthly,
+#bwm-daily table, #bwm-weekly table, #bwm-monthly table,
+#bwm-daily td, #bwm-weekly td, #bwm-monthly td,
+#bwm-daily tr, #bwm-weekly tr, #bwm-monthly tr,
+.bwm-table, .bwm-table td, .bwm-table tr,
+#content table, #content td, #content tr {
+    background: rgba(30, 15, 5, 0.55) !important;
+    color: var(--text-primary) !important;
+}
+
+/* White area behind the graph in bandwidth pages */
+#bwm-graph-container, #bwm-graph div,
+#graph, #graph div, .graph-container,
+#chart-container, #chartDiv,
+div[id^="bwm"], div[class^="bwm"] {
+    background: var(--bwm-bg) !important;
+}
+
+/* ─── */
+
+/* Transparent resets */
+div, td, th, tr, table, tbody, thead,
+.fields, .section, fieldset, legend,
+.tomato-grid, .data-table,
+body > div, #content > div, #container > div {
+    background-color: transparent !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar       { width: 8px; background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
