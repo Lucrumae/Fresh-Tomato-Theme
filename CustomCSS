@@ -167,11 +167,10 @@ a:hover              { color: var(--link-hover-color) !important; }
 #navi a {
     color: var(--text-secondary) !important;
     font-weight: 700 !important;
-    transition: transform var(--transition-speed) ease,
-                color var(--transition-speed) ease;
+    transition: color var(--transition-speed) ease;
 }
 
-#navi a:hover   { transform: translateX(5px); color: var(--accent-highlight) !important; }
+#navi a:hover   { color: var(--accent-highlight) !important; }
 #navi a.indent1 { color: var(--accent-secondary) !important; font-weight: bold !important; }
 
 /* Typography */
