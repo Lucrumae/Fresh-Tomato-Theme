@@ -1,5 +1,5 @@
 /* =================================================================
-   Theme Golden Hours — Sleepy Train at Dusk
+   Theme Golden Hours ï¿½ Sleepy Train at Dusk
    Warm amber interior, overgrown with vines, a cat asleep on the seat.
    Inspired by the quiet beauty of an abandoned train at golden hour.
    ================================================================= */
@@ -7,7 +7,7 @@
 :root {
 
     /* +---------------------------------------------------------+
-       ¦                        LOGOS                            ¦
+       ï¿½                        LOGOS                            ï¿½
        +---------------------------------------------------------+ */
     --logo-left:  url('logol.png');   /* logo on the left side of header  */
     --logo-right: url('logor.png');   /* logo on the right side of header */
@@ -16,57 +16,57 @@
 
 
     /* +---------------------------------------------------------+
-       ¦                    BACKGROUNDS                          ¦
-       ¦  rgba(R, G, B, opacity) — 0.0 transparent, 1.0 opaque  ¦
+       ï¿½                    BACKGROUNDS                          ï¿½
+       ï¿½  rgba(R, G, B, opacity) ï¿½ 0.0 transparent, 1.0 opaque  ï¿½
        +---------------------------------------------------------+ */
     --bg-fallback: #1a0f08;                    /* deep amber shown before video loads        */
-    --panel-bg:    rgba(18, 10, 6, 0.32);       /* main panels — dark amber glass             */
-    --header-bg:   rgba(15, 8, 5, 0.55);        /* header — deep dark brown                   */
-    --log-bg:      rgba(255, 248, 230, 0.94);  /* logs & code blocks — parchment             */
+    --panel-bg:    rgba(18, 10, 6, 0.32);       /* main panels ï¿½ dark amber glass             */
+    --header-bg:   rgba(15, 8, 5, 0.55);        /* header ï¿½ deep dark brown                   */
+    --log-bg:      rgba(255, 248, 230, 0.94);  /* logs & code blocks ï¿½ parchment             */
     --bwm-bg:      rgba(255, 200, 140, 0.07);  /* bandwidth graph area                       */
     --tab-bg:      rgba(15, 8, 5, 0.32);        /* bandwidth tabs                             */
 
 
     /* +---------------------------------------------------------+
-       ¦                   TEXT COLORS                           ¦
+       ï¿½                   TEXT COLORS                           ï¿½
        +---------------------------------------------------------+ */
-    --text-primary:   #f3e9d6;   /* main body text — warm cream                */
-    --text-secondary: #d8b78f;   /* sidebar links & table labels — golden sand */
-    --text-value:     #ffe6c4;   /* table values — warm amber yellow           */
+    --text-primary:   #f3e9d6;   /* main body text ï¿½ warm cream                */
+    --text-secondary: #d8b78f;   /* sidebar links & table labels ï¿½ golden sand */
+    --text-value:     #ffe6c4;   /* table values ï¿½ warm amber yellow           */
     --log-color:      #2b1706;   /* text inside logs & code blocks             */
     --tab-text:       #f0dfc7;   /* text inside bandwidth tabs                 */
 
 
     /* +---------------------------------------------------------+
-       ¦                  ACCENT COLORS                          ¦
+       ï¿½                  ACCENT COLORS                          ï¿½
        +---------------------------------------------------------+ */
-    --accent-primary:   rgba(255, 170, 95, 0.22);   /* borders & dividers — aged wood brown     */
-    --accent-secondary: #e9a866;   /* section titles & categories — bright ember */
-    --accent-highlight: #ffd2a1;   /* hover states — golden flame              */
+    --accent-primary:   rgba(255, 170, 95, 0.22);   /* borders & dividers ï¿½ aged wood brown     */
+    --accent-secondary: #e9a866;   /* section titles & categories ï¿½ bright ember */
+    --accent-highlight: #ffd2a1;   /* hover states ï¿½ golden flame              */
 
 
     /* +---------------------------------------------------------+
-       ¦                     LINKS                               ¦
+       ï¿½                     LINKS                               ï¿½
        +---------------------------------------------------------+ */
-    --link-color:       #e2bc8e;   /* resting link — bright leaf green         */
-    --link-hover-color: #ffe0b8;   /* hover link — golden flame                */
+    --link-color:       #e2bc8e;   /* resting link ï¿½ bright leaf green         */
+    --link-hover-color: #ffe0b8;   /* hover link ï¿½ golden flame                */
 
 
     /* +---------------------------------------------------------+
-       ¦                    BUTTONS                              ¦
+       ï¿½                    BUTTONS                              ï¿½
        +---------------------------------------------------------+ */
-    --btn-bg:    rgba(255, 170, 95, 0.18);   /* button background — aged wood              */
-    --btn-color: #fff5e6;   /* button text — warm white                   */
+    --btn-bg:    rgba(255, 170, 95, 0.18);   /* button background ï¿½ aged wood              */
+    --btn-color: #fff5e6;   /* button text ï¿½ warm white                   */
 
 
     /* +---------------------------------------------------------+
-       ¦               PROGRESS BAR (CPU / RAM / NVRAM)          ¦
+       ï¿½               PROGRESS BAR (CPU / RAM / NVRAM)          ï¿½
        +---------------------------------------------------------+ */
-    --progress-color: #ffbc7a;   /* fill color — normal green */
+    --progress-color: #ffbc7a;   /* fill color ï¿½ normal green */
 
 
     /* +---------------------------------------------------------+
-       ¦                   INPUT FIELDS                          ¦
+       ï¿½                   INPUT FIELDS                          ï¿½
        +---------------------------------------------------------+ */
     --input-bg:     rgba(255, 240, 210, 0.82);   /* warm parchment background */
     --input-color:  #2b1706;                     /* dark brown text           */
@@ -74,32 +74,32 @@
 
 
     /* +---------------------------------------------------------+
-       ¦              BANDWIDTH CHART (SVG)                      ¦
+       ï¿½              BANDWIDTH CHART (SVG)                      ï¿½
        +---------------------------------------------------------+ */
-    --svg-text-color:  #ffe2bd;              /* axis labels — warm bark brown  */
-    --svg-grid-stroke: rgba(255, 170, 95, 0.15); /* grid lines — subtle wood     */
+    --svg-text-color:  #ffe2bd;              /* axis labels ï¿½ warm bark brown  */
+    --svg-grid-stroke: rgba(255, 170, 95, 0.15); /* grid lines ï¿½ subtle wood     */
     --bwm-border:      rgba(255, 170, 95, 0.18); /* borders around graph areas  */
     --svg-bg:          rgba(15, 8, 5, 0.32);    /* SVG graph background (rect inside graph) */
     --tab-active-bg:   rgba(255, 170, 95, 0.18);  /* active tab highlight        */
 
 
     /* +---------------------------------------------------------+
-       ¦                TABLE ROW ALTERNATING                    ¦
+       ï¿½                TABLE ROW ALTERNATING                    ï¿½
        +---------------------------------------------------------+ */
-    --row-even: rgba(255, 200, 140, 0.06);   /* even row tint — warm amber  */
-    --row-odd:  rgba(255, 170, 95, 0.03);    /* odd row tint — subtle ember */
+    --row-even: rgba(255, 200, 140, 0.06);   /* even row tint ï¿½ warm amber  */
+    --row-odd:  rgba(255, 170, 95, 0.03);    /* odd row tint ï¿½ subtle ember */
 
 
     /* +---------------------------------------------------------+
-       ¦                   SCROLLBAR                             ¦
+       ï¿½                   SCROLLBAR                             ï¿½
        +---------------------------------------------------------+ */
     --scrollbar-track: rgba(255, 170, 95, 0.05);   /* track background    */
-    --scrollbar-thumb: rgba(255, 170, 95, 0.35);   /* handle — warm wood  */
-    --scrollbar-hover: rgba(255, 170, 95, 0.55);   /* handle hover — ember */
+    --scrollbar-thumb: rgba(255, 170, 95, 0.35);   /* handle ï¿½ warm wood  */
+    --scrollbar-hover: rgba(255, 170, 95, 0.55);   /* handle hover ï¿½ ember */
 
 
     /* +---------------------------------------------------------+
-       ¦                TRANSITION SPEED                         ¦
+       ï¿½                TRANSITION SPEED                         ï¿½
        +---------------------------------------------------------+ */
     --transition-speed: 0.22s;
 
@@ -163,11 +163,10 @@ a:hover              { color: var(--link-hover-color) !important; }
 #navi a {
     color: var(--text-secondary) !important;
     font-weight: 700 !important;
-    transition: transform var(--transition-speed) ease,
                 color var(--transition-speed) ease;
 }
 
-#navi a:hover   { transform: translateX(5px); color: var(--accent-highlight) !important; }
+#navi a:hover   { color: var(--accent-highlight) !important; }
 #navi a.indent1 { color: var(--accent-secondary) !important; font-weight: bold !important; }
 
 body, div, p, li, label, .message, .content {
