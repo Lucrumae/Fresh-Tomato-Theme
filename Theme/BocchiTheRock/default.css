@@ -67,10 +67,8 @@ tr, td, th {
 #navi a {
     color: var(--text-color) !important;
     font-weight: 700 !important;
-    transition: transform var(--transition-speed) ease;
 }
 #navi a:hover {
-    transform: translateX(5px);
     color: var(--accent-red) !important;
 }
 #navi a.indent1 { color: #cc0000 !important; font-weight: bold !important; }
