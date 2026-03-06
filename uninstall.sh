@@ -182,6 +182,10 @@ if [ "$RESET_CREDS" = "1" ]; then
     echo -e "  ${DIM}SSH credentials have been reset. Reconnect using:${NC}"
     echo -e "  ${CYAN}  ssh root@${LAN_IP}${NC}"
     echo ""; divider; echo ""
-    sleep 3
-    service sshd restart >/dev/null 2>&1
+    # Restart sshd di background agar session tidak langsung putus
+    ( sleep 3
+      killall -9 dropbear 2>/dev/null
+      sleep 1
+      service sshd start >/dev/null 2>&1
+    ) &
 fi

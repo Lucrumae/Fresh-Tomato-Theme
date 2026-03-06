@@ -124,7 +124,7 @@
       <div class="card-subtitle">Router Administration</div>
     </div>
     <div class="divider"></div>
-    <form id="form" autocomplete="on">
+    <form id="form" autocomplete="off">
       <div class="field">
         <label for="username">Username</label>
         <div class="field-wrap">
@@ -326,13 +326,21 @@
 
     var creds = 'Basic ' + btoa(unescape(encodeURIComponent(user + ':' + pass)));
 
+    // X-Requested-With: XMLHttpRequest menandai ini request AJAX dari our code
+    // SameSite=Strict pada cookie sudah mencegah CSRF cross-site
     fetch('/index.asp', {
       method: 'GET',
-      headers: {'X-Login-Auth': creds},
+      headers: {
+        'X-Login-Auth': creds,
+        'X-Requested-With': 'XMLHttpRequest'
+      },
       credentials: 'omit'
     })
     .then(function(r){
       if(r.ok){
+        // Simpan auth cookie — SameSite=Strict mencegah CSRF
+        // Catatan: HttpOnly tidak bisa di-set via JS; nginx location / strip
+        // X-Login-Auth sebelum forward sehingga header tidak bocor ke httpd
         document.cookie = 'ft_auth=' + encodeURIComponent(creds) + '; Path=/; Max-Age=28800; SameSite=Strict';
         sessionStorage.removeItem('ft_session_unmuted');
         // Flag untuk trigger tip "hide panel" di router - hanya pertama kali login
@@ -340,8 +348,10 @@
           localStorage.setItem(FIRST_LOGIN, '1');
           sessionStorage.setItem('ft_show_panel_tip', '1');
         }
+        // Clear credentials dari memory segera setelah cookie tersimpan
         creds = null; pass = null;
         document.getElementById('password').value = '';
+        document.getElementById('username').value = '';
         window.location.replace('/index.asp');
       } else {
         btn.classList.remove('loading');

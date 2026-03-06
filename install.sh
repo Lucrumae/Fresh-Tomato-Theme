@@ -387,6 +387,8 @@ if [ $? -eq 0 ] && [ -s "$INSTALL_PATH/reboot-wait.html" ]; then
     # Inject http_id ke reboot-wait.html
     FT_HTTP_ID=$(nvram get http_id 2>/dev/null)
     sed -i "s/FT_HTTP_ID/${FT_HTTP_ID}/g" "$INSTALL_PATH/reboot-wait.html"
+    sed -i "s/FT_HTTP_ID/$_ID/g" "$INSTALL_PATH/halt-wait.html" 2>/dev/null
+    sed -i "s/FT_HTTP_ID/$_ID/g" "$SAFE_NGINX/static/halt-wait.html" 2>/dev/null
 else
     echo -e "${RED}failed${NC}"; fail "Cannot download reboot-wait.html."; exit 1
 fi
@@ -826,6 +828,21 @@ http {
         # Block PHP — adminer.php dan phpinfo.php ada di /www, berbahaya jika diakses
         location ~* \.php$ { deny all; return 404; }
 
+        # Eksplisit block file sensitif di /www
+        location ~* ^/(adminer|phpinfo|phpmyadmin)(\.php)?$ { deny all; return 404; }
+        location ~* /(web-mysql|web-nginx)\.asp$ {
+            # Halaman admin DB/nginx — hanya izinkan jika sudah auth
+            set \$db_auth "0";
+            if (\$cookie_ft_auth) { set \$db_auth "1"; }
+            if (\$db_auth = "0") { return 302 /login.html; }
+            proxy_pass http://httpd_upstream;
+            proxy_set_header Authorization \$auth_header;
+            proxy_set_header X-Login-Auth "";
+            proxy_set_header Host \$host;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+        }
+
         # Logout — intercept semua URL yang mengandung /logout
         # logout.asp di /www tetap ada tapi nginx clear cookie dulu
         location ~* ^.*/logout(\.asp)?$ {
@@ -953,6 +970,8 @@ http {
             proxy_set_header Authorization \$auth_header;
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
+            # Strip X-Login-Auth agar tidak diteruskan ke httpd backend
+            proxy_set_header X-Login-Auth "";
             proxy_http_version 1.1;
             proxy_set_header Connection "";
         }
@@ -963,6 +982,8 @@ http {
             proxy_set_header Authorization \$auth_header;
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
+            # Strip X-Login-Auth agar tidak diteruskan ke httpd backend
+            proxy_set_header X-Login-Auth "";
             proxy_http_version 1.1;
             proxy_set_header Connection "";
         }
@@ -972,6 +993,8 @@ http {
             proxy_set_header Authorization \$auth_header;
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
+            # Strip X-Login-Auth agar tidak diteruskan ke httpd backend
+            proxy_set_header X-Login-Auth "";
             proxy_http_version 1.1;
             proxy_set_header Connection "";
         }

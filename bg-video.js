@@ -391,6 +391,14 @@
         setTimeout(function(){ showAlertDialog((msg||'').toString()); }, 0);
     };
 
+    // escHtml: escape karakter HTML — definisi global di IIFE scope
+    // Dipakai oleh showAlertDialog, showRebootDialog, showGenericDialog
+    function escHtml(s){
+        return (s||'').replace(/[&<>"'`]/g,function(x){
+            return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#x27;','`':'&#x60;'}[x];
+        });
+    }
+
     function showAlertDialog(msg){
         if(document.getElementById('ft-alert')) return;
         var acc = getAccentNow();
@@ -759,12 +767,20 @@
                     // Redirect ke halt-wait.html dulu
                     window.location.href = '/halt-wait.html';
                     // shutdown.cgi butuh http_id sama seperti tomato.cgi
+                    // http_id wajib untuk shutdown.cgi — ambil dari nvram jika ada
+                    // FT_HTTP_ID akan diganti install.sh dengan nilai nvram http_id yang benar
                     var httpId = (typeof nvram !== 'undefined' && nvram.http_id) ? nvram.http_id : 'FT_HTTP_ID';
-                    var xs = new XMLHttpRequest();
-                    xs.open('POST', '/shutdown.cgi', true);
-                    xs.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                    xs.timeout = 5000;
-                    xs.send('_http_id=' + encodeURIComponent(httpId));
+                    if(httpId && httpId !== 'FT_HTTP_ID'){
+                        var xs = new XMLHttpRequest();
+                        xs.open('POST', '/shutdown.cgi', true);
+                        xs.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                        xs.timeout = 5000;
+                        xs.send('_http_id=' + encodeURIComponent(httpId));
+                    } else {
+                        // Fallback: navigasi ke halt-wait.html dulu, coba via tomato.cgi
+                        // httpId belum tersedia — halaman sudah berpindah, akan timeout normal
+                        console.warn('[FT] halt: http_id unavailable, using page navigation only');
+                    }
                 } else {
                     // Set bypass untuk pesan ini (3 detik)
                     _ftSetConfirmed(msg, 10000);
