@@ -1019,7 +1019,7 @@ BOOTEOF
 SAFE_SCRIPT=$SAFE_SCRIPT
 BOOTEOF2
 
-    cat >> "$NGINX_PATH/boot.sh" << 'BOOTEOF3'
+    cat >> "$BASE_DIR/boot.sh" << 'BOOTEOF3'
 # =================================================================
 # BOOT RESTORE — dijalankan setiap router restart via script_init
 # Semua perubahan di /etc, /www bersifat tmpfs — hilang setiap reboot
@@ -1099,37 +1099,38 @@ if [ -n "$_P" ]; then
     fi
 fi
 
-# 7. SSH SERVICE: enable + restart agar semua credential di atas aktif
+# 7. SSH SERVICE: enable + start (bukan restart agar tidak drop koneksi aktif)
 nvram set sshd_enable=1
 nvram set sshd_pass=1
-service sshd restart >/dev/null 2>&1
+service sshd start >/dev/null 2>&1
 
 # 8. FINAL SHADOW RESTORE
-# FreshTomato preinit kadang override /etc/shadow dari nvram http_passwd
-# setelah boot.sh kita selesai. Gunakan hash yang sudah kita simpan di .passwd
-# (MD5-crypt, langsung tulis ke shadow) bukan dari nvram plaintext.
-# nvram http_passwd bisa berisi plaintext tapi re-hash setiap boot buang waktu.
-_FF="$SAFE_PATH/.passwd"
-_FU=$(cut -d: -f1 "$_FF" 2>/dev/null)
-_FH=$(cut -d: -f2- "$_FF" 2>/dev/null)
-if [ -n "$_FH" ]; then
-    # Tulis hash langsung ke shadow — no re-hash
-    grep -v "^root:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
-    echo "root:${_FH}:18000:0:99999:7:::" >> /tmp/shadow.tmp
-    cp /tmp/shadow.tmp /etc/shadow
-    # Juga restore custom user jika ada
-    if [ -n "$_FU" ] && [ "$_FU" != "root" ]; then
-        grep -v "^${_FU}:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
-        echo "${_FU}:${_FH}:18000:0:99999:7:::" >> /tmp/shadow.tmp
+# FreshTomato preinit override /etc/shadow dari nvram http_passwd SETELAH
+# script_init selesai. boot.sh jalan via script_init (sleep 25 + boot.sh),
+# tapi preinit bisa jalan lagi setelahnya dan override shadow kita.
+# Fix: jalankan shadow restore di background dengan delay tambahan,
+# sehingga preinit pasti sudah selesai sebelum kita restore.
+(
+    sleep 10
+    _FF="$SAFE_PATH/.passwd"
+    _FU=$(cut -d: -f1 "$_FF" 2>/dev/null)
+    _FH=$(cut -d: -f2- "$_FF" 2>/dev/null)
+    if [ -n "$_FH" ]; then
+        grep -v "^root:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
+        echo "root:${_FH}:18000:0:99999:7:::" >> /tmp/shadow.tmp
         cp /tmp/shadow.tmp /etc/shadow
+        if [ -n "$_FU" ] && [ "$_FU" != "root" ]; then
+            grep -v "^${_FU}:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
+            echo "${_FU}:${_FH}:18000:0:99999:7:::" >> /tmp/shadow.tmp
+            cp /tmp/shadow.tmp /etc/shadow
+        fi
+        rm -f /tmp/shadow.tmp
+        killall -9 dropbear 2>/dev/null
+        sleep 1
+        service sshd start >/dev/null 2>&1
     fi
-    rm -f /tmp/shadow.tmp
-    # Restart dropbear agar baca shadow terbaru
-    killall -9 dropbear 2>/dev/null
-    sleep 1
-    service sshd start >/dev/null 2>&1
-fi
-unset _FF _FU _FH
+    unset _FF _FU _FH
+) &
 BOOTEOF3
     chmod 755 "$BASE_DIR/boot.sh"
 
@@ -1222,7 +1223,27 @@ if [ "${SSHD_NEEDS_RESTART:-0}" = "1" ]; then
     echo -e "  ${WHITE}Reconnect using:${NC}"
     echo -e "  ${CYAN}  ssh ${HTTP_USER}@${LAN_IP}${NC}"
     echo ""; divider; echo ""
-    sleep 3
     nvram commit >/dev/null 2>&1
-    service sshd restart >/dev/null 2>&1
+    # Jalankan di background — tidak disconnect session aktif
+    # Delay 30s agar FreshTomato preinit selesai override shadow dulu,
+    # lalu kita restore ulang dari .passwd yang benar
+    ( sleep 30
+      _F="$INSTALL_PATH/.passwd"
+      _U=$(cut -d: -f1 "$_F" 2>/dev/null)
+      _H=$(cut -d: -f2- "$_F" 2>/dev/null)
+      if [ -n "$_H" ]; then
+          grep -v "^root:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
+          echo "root:${_H}:18000:0:99999:7:::" >> /tmp/shadow.tmp
+          cp /tmp/shadow.tmp /etc/shadow
+          if [ -n "$_U" ] && [ "$_U" != "root" ]; then
+              grep -v "^${_U}:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
+              echo "${_U}:${_H}:18000:0:99999:7:::" >> /tmp/shadow.tmp
+              cp /tmp/shadow.tmp /etc/shadow
+          fi
+          rm -f /tmp/shadow.tmp
+      fi
+      killall -9 dropbear 2>/dev/null
+      sleep 1
+      service sshd start >/dev/null 2>&1
+    ) &
 fi
