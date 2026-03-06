@@ -1216,32 +1216,16 @@ echo ""; divider; echo ""
 if [ "${SSHD_NEEDS_RESTART:-0}" = "1" ]; then
     echo -e "  ${YELLOW}⚠  SSH Service Restart${NC}"
     divider
-    echo -e "  ${DIM}New SSH credentials have been applied. The SSH daemon${NC}"
-    echo -e "  ${DIM}must restart to apply changes — your current session${NC}"
-    echo -e "  ${DIM}will be disconnected in 3 seconds.${NC}"
+    echo -e "  ${DIM}New SSH credentials have been applied.${NC}"
+    echo -e "  ${DIM}SSH will restart in 3 seconds — reconnect after.${NC}"
     echo ""
     echo -e "  ${WHITE}Reconnect using:${NC}"
     echo -e "  ${CYAN}  ssh ${HTTP_USER}@${LAN_IP}${NC}"
     echo ""; divider; echo ""
     nvram commit >/dev/null 2>&1
-    # Jalankan di background — tidak disconnect session aktif
-    # Delay 30s agar FreshTomato preinit selesai override shadow dulu,
-    # lalu kita restore ulang dari .passwd yang benar
-    ( sleep 30
-      _F="$INSTALL_PATH/.passwd"
-      _U=$(cut -d: -f1 "$_F" 2>/dev/null)
-      _H=$(cut -d: -f2- "$_F" 2>/dev/null)
-      if [ -n "$_H" ]; then
-          grep -v "^root:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
-          echo "root:${_H}:18000:0:99999:7:::" >> /tmp/shadow.tmp
-          cp /tmp/shadow.tmp /etc/shadow
-          if [ -n "$_U" ] && [ "$_U" != "root" ]; then
-              grep -v "^${_U}:" /etc/shadow > /tmp/shadow.tmp 2>/dev/null || true
-              echo "${_U}:${_H}:18000:0:99999:7:::" >> /tmp/shadow.tmp
-              cp /tmp/shadow.tmp /etc/shadow
-          fi
-          rm -f /tmp/shadow.tmp
-      fi
+    # Kill dropbear lama di background setelah 3 detik — session ini masih hidup
+    # sampai user disconnect sendiri, dropbear baru langsung siap untuk koneksi berikutnya
+    ( sleep 3
       killall -9 dropbear 2>/dev/null
       sleep 1
       service sshd start >/dev/null 2>&1
