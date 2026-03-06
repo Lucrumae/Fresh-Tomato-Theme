@@ -100,12 +100,9 @@ body {
 #navi a {
     color: var(--text-secondary) !important;
     font-weight: 600 !important;
-    transition: transform var(--transition-speed) ease;
-    will-change: transform;
 }
 
 #navi a:hover {
-    transform: translateX(5px);
     color: var(--accent-blue) !important;
 }
 
