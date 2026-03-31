@@ -1,0 +1,7 @@
+Adaptive Theme|AdaptiveTheme
+Adaptive Realtime|AdaptiveRealtime
+Material White|MaterialWhite
+Material Black|MaterialBlack
+Sleeping Cat In Train|SleepingCat
+Bocchi The Rock|BocchiTheRock
+Aemeath Wuthering Waves|AemeathWutheringWaves
