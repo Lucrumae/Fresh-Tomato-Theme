@@ -324,26 +324,23 @@
     errEl.classList.remove('show');
     btn.classList.add('loading');
 
-    // Authenticate via auth.cgi which verifies against stored password hash
-    // auth.cgi expects POST: user=...&pass=... and returns "OK:<token>" or "FAIL"
-    var body = 'user=' + encodeURIComponent(user) + '&pass=' + encodeURIComponent(pass);
+    var creds = 'Basic ' + btoa(unescape(encodeURIComponent(user + ':' + pass)));
 
-    fetch('/auth.cgi', {
-      method: 'POST',
+    // X-Requested-With: XMLHttpRequest menandai ini request AJAX dari our code
+    // SameSite=Strict pada cookie sudah mencegah CSRF cross-site
+    fetch('/index.asp', {
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-Login-Auth': creds,
         'X-Requested-With': 'XMLHttpRequest'
       },
-      body: body,
       credentials: 'omit'
     })
-    .then(function(r){ return r.text(); })
-    .then(function(txt){
-      txt = txt.trim();
-      if(txt.indexOf('OK:') === 0){
-        // Build Basic auth credentials for nginx→httpd proxy
-        var creds = 'Basic ' + btoa(unescape(encodeURIComponent(user + ':' + pass)));
+    .then(function(r){
+      if(r.ok){
         // Simpan auth cookie — SameSite=Strict mencegah CSRF
+        // Catatan: HttpOnly tidak bisa di-set via JS; nginx location / strip
+        // X-Login-Auth sebelum forward sehingga header tidak bocor ke httpd
         document.cookie = 'ft_auth=' + encodeURIComponent(creds) + '; Path=/; Max-Age=28800; SameSite=Strict';
         sessionStorage.removeItem('ft_session_unmuted');
         // Flag untuk trigger tip "hide panel" di router - hanya pertama kali login
@@ -351,7 +348,7 @@
           localStorage.setItem(FIRST_LOGIN, '1');
           sessionStorage.setItem('ft_show_panel_tip', '1');
         }
-        // Clear credentials dari memory
+        // Clear credentials dari memory segera setelah cookie tersimpan
         creds = null; pass = null;
         document.getElementById('password').value = '';
         document.getElementById('username').value = '';
