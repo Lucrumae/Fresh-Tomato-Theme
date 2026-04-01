@@ -871,6 +871,19 @@ http {
             try_files \$uri =404;
         }
 
+        # auth.cgi — login authentication endpoint, rate limited
+        # No auth required (this IS the login endpoint)
+        location = /auth.cgi {
+            limit_req zone=login burst=5 nodelay;
+            proxy_pass http://httpd_upstream;
+            proxy_set_header Authorization \$auth_header;
+            proxy_set_header Host \$host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header X-Login-Auth "";
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+        }
+
         # Root "/" — cek cookie, proxy atau redirect ke login
         location = / {
             set \$do_login "1";
