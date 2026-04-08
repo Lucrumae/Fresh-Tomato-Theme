@@ -124,6 +124,6 @@ Tested on: **Cisco Linksys EA6300v1 / EA6400** (ARMv7, FreshTomato 2026.1)
 
 <div align="center">
 
-Personal project for my FreshTomato Linksys EA6300v1/EA6400
+A personal project for my FreshTomato Linksys EA6300v1/EA6400 using Claude AI
 
 </div>
